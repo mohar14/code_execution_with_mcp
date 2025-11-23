@@ -13,6 +13,7 @@ pinned: false
 - **Mohar Dey** - [@mohar1406](https://huggingface.co/mohar1406) - Lead Developer
 - **Jonathan Kadowaki** - [@jkadowak](https://huggingface.co/jkadowak) - Lead Developer
 
+**UI**
 
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
