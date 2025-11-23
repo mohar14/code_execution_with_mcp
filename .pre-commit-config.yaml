@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.6
+    hooks:
+      # Run the formatter first
+      - id: ruff-format
+        name: ruff format
+        description: Format code with ruff
+        # This will fail if any files are reformatted
+
+      # Run the linter second with auto-fix
+      - id: ruff
+        name: ruff lint
+        description: Lint code with ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        # --fix: automatically fix violations where possible
+        # --exit-non-zero-on-fix: return non-zero exit code if fixes were applied
