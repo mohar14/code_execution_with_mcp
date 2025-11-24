@@ -67,9 +67,7 @@ def get_user_id(ctx: Context) -> str:
     """Extract user ID from MCP request context.
 
     Checks for user ID in multiple possible header locations:
-    1. X-User-ID header
-    2. X-MCP-User-ID header
-    3. Falls back to "default" if not found
+    1. x-user-id
 
     Args:
         ctx: FastMCP request context
@@ -259,35 +257,21 @@ async def read_docstring(
     logger.info(f"Reading docstring for user {user_id}: {file_path}:{function_name}")
 
     try:
-        # Use Python to dynamically import and get the docstring
-        python_cmd = (
-            f"import sys; "
-            f"import importlib.util; "
-            f"spec = importlib.util.spec_from_file_location('temp_module', '{file_path}'); "
-            f"module = importlib.util.module_from_spec(spec); "
-            f"spec.loader.exec_module(module); "
-            f"print(getattr(module, '{function_name}').__doc__ or '')"
-        )
-
-        exit_code, stdout, stderr = await docker_client.execute_bash(
+        docstring = await docker_client.read_file_docstring(
             user_id=user_id,
-            command=f"python -c \"{python_cmd}\"",
-            timeout=10,
+            file_path=file_path,
+            function_name=function_name,
         )
 
-        if exit_code == 0:
-            docstring = stdout.strip()
-            if docstring:
-                logger.info(f"Successfully retrieved docstring for {function_name}")
-            else:
-                logger.warning(f"No docstring found for {file_path}:{function_name}")
-            return docstring
+        if docstring:
+            logger.info(f"Successfully retrieved docstring for {function_name}")
         else:
-            logger.error(f"Error reading docstring: {stderr}")
-            return ""
+            logger.warning(f"No docstring found for {file_path}:{function_name}")
+
+        return docstring
 
     except Exception as e:
-        logger.error(f"Error reading docstring: {e}")
+        logger.error(f"Error reading docstring for user {user_id}: {e}")
         return ""
 
 
@@ -308,4 +292,4 @@ async def health_check():
 
 if __name__ == "__main__":
     # Run the MCP server
-    mcp.run()
+    mcp.run(transport="streamable-http", port=8989)
