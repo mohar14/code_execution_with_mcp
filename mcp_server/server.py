@@ -13,6 +13,13 @@ from fastmcp import Context
 
 from docker_client import DockerExecutionClient
 from starlette.responses import JSONResponse
+from starlette.requests import Request
+from utils import (
+    list_available_skills,
+    get_skill,
+    generate_skills_section,
+    generate_agent_prompt,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -275,10 +282,46 @@ async def read_docstring(
         return ""
 
 
+@mcp.prompt()
+def agent_system_prompt() -> str:
+    """Generate a system prompt for agents with embedded skill descriptions.
+
+    This prompt provides agents with:
+    - Overview of the skills system
+    - Dynamically embedded skill descriptions from /skills/ folder
+    - Workflow patterns for using skills with read_file tool
+    - Complete usage examples (no API calls, no package installation)
+
+    Returns:
+        Complete system prompt with all available skills embedded
+    """
+    logger.info("Generating agent system prompt with embedded skills")
+
+    try:
+        # Get all available skills
+        skills = list_available_skills()
+
+        # Generate skills section
+        skills_section = generate_skills_section(skills)
+
+        # Generate complete prompt
+        prompt = generate_agent_prompt(skills_section)
+
+        logger.info(f"Generated agent prompt with {len(skills)} skills")
+        return prompt
+
+    except Exception as e:
+        logger.error(f"Error generating agent prompt: {e}")
+        raise
+
+
 # HTTP health check endpoint
 @mcp.custom_route("/health", methods=["GET"])
-async def health_check():
+async def health_check(request: Request):
     """HTTP health check endpoint for monitoring and load balancers.
+
+    Args:
+        request: Starlette request object
 
     Returns:
         JSON response with server status
@@ -288,6 +331,55 @@ async def health_check():
         "service": "mcp-code-executor",
         "client_initialized": docker_client is not None,
     })
+
+
+# Skills endpoints
+@mcp.custom_route("/skills", methods=["GET"])
+async def list_skills(request: Request):
+    """List all available skills.
+
+    Args:
+        request: Starlette request object
+
+    Returns:
+        JSON response with list of available skills
+    """
+    try:
+        skills = list_available_skills()
+        return JSONResponse({
+            "skills": skills,
+            "count": len(skills),
+        })
+    except Exception as e:
+        logger.error(f"Error listing skills: {e}")
+        return JSONResponse({
+            "error": str(e),
+        }, status_code=500)
+
+
+@mcp.custom_route("/skills/{skill_name}", methods=["GET"])
+async def get_skill_by_name(request: Request):
+    """Retrieve a specific skill by name.
+
+    Args:
+        request: Starlette request object (skill_name extracted from path)
+
+    Returns:
+        JSON response with complete skill data including content
+    """
+    skill_name = request.path_params.get("skill_name")
+    try:
+        skill_data = get_skill(skill_name)
+        return JSONResponse(skill_data)
+    except FileNotFoundError as e:
+        return JSONResponse({
+            "error": str(e),
+        }, status_code=404)
+    except Exception as e:
+        logger.error(f"Error retrieving skill {skill_name}: {e}")
+        return JSONResponse({
+            "error": str(e),
+        }, status_code=500)
 
 
 if __name__ == "__main__":
