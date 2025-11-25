@@ -22,6 +22,24 @@ RUN mkdir -p /workspace && \
     chown coderunner:coderunner /workspace && \
     chmod 755 /workspace
 
+# Install common data analysis and statistics libraries
+RUN pip install --no-cache-dir \
+    numpy==1.26.4 \
+    pandas==2.2.0 \
+    scipy==1.12.0 \
+    matplotlib==3.8.2 \
+    seaborn==0.13.2 \
+    scikit-learn==1.4.0 \
+    statsmodels==0.14.1 \
+    jupyter==1.0.0 \
+    openpyxl==3.1.2 \
+    requests==2.31.0 \
+    plotly==5.18.0 \
+    sympy==1.12
+
+# Add /tools to PYTHONPATH so tools can be imported
+ENV PYTHONPATH=/tools
+
 # Set working directory
 WORKDIR /workspace
 

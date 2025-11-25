@@ -91,7 +91,6 @@ class DockerExecutionClient:
             stdin_open=True,
             volumes=volumes,
             name=f"mcp-executor-{user_id}",
-            remove=False,  # Keep container for reuse
         )
 
         container.start()
