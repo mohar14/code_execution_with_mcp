@@ -19,7 +19,7 @@ A secure, containerized code execution platform for AI agents with multi-user is
 
 ## Architecture
 
-![Architecture Diagram](./docs/architecture.png)
+![Architecture Diagram](https://huggingface.co/spaces/MCP-1st-Birthday/code-execution-with-mcp/blob/refs%2Fpr%2F2/docs/architecture.png)
 
 <details>
 <summary>View/Edit Diagram Source</summary>
