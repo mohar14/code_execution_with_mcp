@@ -13,6 +13,13 @@ from fastmcp import Context
 
 from docker_client import DockerExecutionClient
 from starlette.responses import JSONResponse
+from starlette.requests import Request
+from utils import (
+    list_available_skills,
+    get_skill,
+    generate_skills_section,
+    generate_agent_prompt,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -67,9 +74,7 @@ def get_user_id(ctx: Context) -> str:
     """Extract user ID from MCP request context.
 
     Checks for user ID in multiple possible header locations:
-    1. X-User-ID header
-    2. X-MCP-User-ID header
-    3. Falls back to "default" if not found
+    1. x-user-id
 
     Args:
         ctx: FastMCP request context
@@ -259,42 +264,64 @@ async def read_docstring(
     logger.info(f"Reading docstring for user {user_id}: {file_path}:{function_name}")
 
     try:
-        # Use Python to dynamically import and get the docstring
-        python_cmd = (
-            f"import sys; "
-            f"import importlib.util; "
-            f"spec = importlib.util.spec_from_file_location('temp_module', '{file_path}'); "
-            f"module = importlib.util.module_from_spec(spec); "
-            f"spec.loader.exec_module(module); "
-            f"print(getattr(module, '{function_name}').__doc__ or '')"
-        )
-
-        exit_code, stdout, stderr = await docker_client.execute_bash(
+        docstring = await docker_client.read_file_docstring(
             user_id=user_id,
-            command=f"python -c \"{python_cmd}\"",
-            timeout=10,
+            file_path=file_path,
+            function_name=function_name,
         )
 
-        if exit_code == 0:
-            docstring = stdout.strip()
-            if docstring:
-                logger.info(f"Successfully retrieved docstring for {function_name}")
-            else:
-                logger.warning(f"No docstring found for {file_path}:{function_name}")
-            return docstring
+        if docstring:
+            logger.info(f"Successfully retrieved docstring for {function_name}")
         else:
-            logger.error(f"Error reading docstring: {stderr}")
-            return ""
+            logger.warning(f"No docstring found for {file_path}:{function_name}")
+
+        return docstring
 
     except Exception as e:
-        logger.error(f"Error reading docstring: {e}")
+        logger.error(f"Error reading docstring for user {user_id}: {e}")
         return ""
+
+
+@mcp.prompt()
+def agent_system_prompt() -> str:
+    """Generate a system prompt for agents with embedded skill descriptions.
+
+    This prompt provides agents with:
+    - Overview of the skills system
+    - Dynamically embedded skill descriptions from /skills/ folder
+    - Workflow patterns for using skills with read_file tool
+    - Complete usage examples (no API calls, no package installation)
+
+    Returns:
+        Complete system prompt with all available skills embedded
+    """
+    logger.info("Generating agent system prompt with embedded skills")
+
+    try:
+        # Get all available skills
+        skills = list_available_skills()
+
+        # Generate skills section
+        skills_section = generate_skills_section(skills)
+
+        # Generate complete prompt
+        prompt = generate_agent_prompt(skills_section)
+
+        logger.info(f"Generated agent prompt with {len(skills)} skills")
+        return prompt
+
+    except Exception as e:
+        logger.error(f"Error generating agent prompt: {e}")
+        raise
 
 
 # HTTP health check endpoint
 @mcp.custom_route("/health", methods=["GET"])
-async def health_check():
+async def health_check(request: Request):
     """HTTP health check endpoint for monitoring and load balancers.
+
+    Args:
+        request: Starlette request object
 
     Returns:
         JSON response with server status
@@ -306,6 +333,55 @@ async def health_check():
     })
 
 
+# Skills endpoints
+@mcp.custom_route("/skills", methods=["GET"])
+async def list_skills(request: Request):
+    """List all available skills.
+
+    Args:
+        request: Starlette request object
+
+    Returns:
+        JSON response with list of available skills
+    """
+    try:
+        skills = list_available_skills()
+        return JSONResponse({
+            "skills": skills,
+            "count": len(skills),
+        })
+    except Exception as e:
+        logger.error(f"Error listing skills: {e}")
+        return JSONResponse({
+            "error": str(e),
+        }, status_code=500)
+
+
+@mcp.custom_route("/skills/{skill_name}", methods=["GET"])
+async def get_skill_by_name(request: Request):
+    """Retrieve a specific skill by name.
+
+    Args:
+        request: Starlette request object (skill_name extracted from path)
+
+    Returns:
+        JSON response with complete skill data including content
+    """
+    skill_name = request.path_params.get("skill_name")
+    try:
+        skill_data = get_skill(skill_name)
+        return JSONResponse(skill_data)
+    except FileNotFoundError as e:
+        return JSONResponse({
+            "error": str(e),
+        }, status_code=404)
+    except Exception as e:
+        logger.error(f"Error retrieving skill {skill_name}: {e}")
+        return JSONResponse({
+            "error": str(e),
+        }, status_code=500)
+
+
 if __name__ == "__main__":
     # Run the MCP server
-    mcp.run()
+    mcp.run(transport="streamable-http", port=8989)

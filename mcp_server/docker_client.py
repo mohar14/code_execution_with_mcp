@@ -228,6 +228,40 @@ class DockerExecutionClient:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _get_docstring)
 
+    async def read_file_docstring(
+        self, user_id: str, file_path: str, function_name: str
+    ) -> str:
+        """Read the docstring of a function from a Python file in the user's container.
+
+        Args:
+            user_id: Unique identifier for the user
+            file_path: Absolute path to the Python file in the container
+            function_name: Name of the function to get docstring from
+
+        Returns:
+            Function docstring as string, or empty string if not found
+        """
+        # Build Python command to dynamically import and extract docstring
+        python_cmd = (
+            f"import sys; "
+            f"import importlib.util; "
+            f"spec = importlib.util.spec_from_file_location('temp_module', '{file_path}'); "
+            f"module = importlib.util.module_from_spec(spec); "
+            f"spec.loader.exec_module(module); "
+            f"print(getattr(module, '{function_name}').__doc__ or '')"
+        )
+
+        exit_code, stdout, stderr = await self.execute_bash(
+            user_id=user_id,
+            command=f'python -c "{python_cmd}"',
+            timeout=10,
+        )
+
+        if exit_code == 0:
+            return stdout.strip()
+        else:
+            raise RuntimeError(f"Failed to read docstring from {file_path}: {stderr}")
+
     def stop_container(self, user_id: str) -> None:
         """Stop a user's container.
 

@@ -493,3 +493,103 @@ class TestUserIsolation:
             # File should not exist for user2
             assert output["exit_code"] != 0
             assert "No such file" in output["stderr"] or "No such file" in output["stdout"]
+
+
+class TestSkillsEndpoints:
+    """Tests for the skills API functionality."""
+
+    def test_parse_skill_frontmatter(self):
+        """Test parsing YAML frontmatter from skill markdown."""
+        from utils.skill_utils import parse_skill_frontmatter
+
+        content = """---
+name: Test Skill
+description: A test skill
+version: 1.0.0
+dependencies: numpy>=1.0
+---
+
+# Test Content
+
+This is the skill body.
+"""
+        metadata, body = parse_skill_frontmatter(content)
+
+        assert metadata["name"] == "Test Skill"
+        assert metadata["description"] == "A test skill"
+        assert metadata["version"] == "1.0.0"
+        assert metadata["dependencies"] == "numpy>=1.0"
+        assert "# Test Content" in body
+
+    def test_list_available_skills(self):
+        """Test listing all available skills."""
+        from utils.skill_utils import list_available_skills
+
+        skills = list_available_skills()
+
+        assert isinstance(skills, list)
+        assert len(skills) >= 1  # At least the symbolic-computation skill
+
+        # Find the symbolic-computation skill
+        sympy_skill = next((s for s in skills if s["skill_id"] == "symbolic-computation"), None)
+        assert sympy_skill is not None
+        assert sympy_skill["name"] == "Symbolic Computation"
+        assert "sympy" in sympy_skill["description"].lower()
+        assert sympy_skill["version"] == "1.0.0"
+
+    def test_get_skill(self):
+        """Test retrieving a specific skill by name."""
+        from utils.skill_utils import get_skill
+
+        skill_data = get_skill("symbolic-computation")
+
+        # Verify metadata
+        assert skill_data["skill_id"] == "symbolic-computation"
+        assert skill_data["name"] == "Symbolic Computation"
+        assert "sympy" in skill_data["description"].lower()
+        assert skill_data["version"] == "1.0.0"
+        assert "sympy" in skill_data["dependencies"].lower()
+
+        # Verify content is present
+        assert skill_data["content"]
+        assert "SymPy" in skill_data["content"]
+        assert "Calculus" in skill_data["content"]
+        assert "derivatives" in skill_data["content"].lower()
+
+    def test_get_nonexistent_skill(self):
+        """Test requesting a skill that doesn't exist."""
+        from utils.skill_utils import get_skill
+        import pytest
+
+        with pytest.raises(FileNotFoundError, match="not found"):
+            get_skill("nonexistent-skill")
+
+    async def test_agent_system_prompt(self, mcp_client: FastMCPClient):
+        """Test the agent_system_prompt MCP prompt."""
+        # List prompts
+        prompts = await mcp_client.list_prompts()
+        prompt_names = [p.name for p in prompts]
+
+        assert "agent_system_prompt" in prompt_names
+
+        # Get the prompt
+        result = await mcp_client.get_prompt("agent_system_prompt")
+
+        assert result.messages
+        assert len(result.messages) > 0
+
+        prompt_text = result.messages[0].content.text
+
+        # Verify key sections
+        assert "Agentic Code Execution with Domain Skills" in prompt_text
+        assert "Available Skills" in prompt_text
+        assert "symbolic-computation" in prompt_text
+        assert "/skills/" in prompt_text
+        assert "read_file" in prompt_text
+
+        # Verify NO API calls
+        assert "curl" not in prompt_text.lower()
+        assert "http://" not in prompt_text
+
+        # Verify NO package installation
+        assert "pip install" not in prompt_text
