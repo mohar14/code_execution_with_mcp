@@ -20,11 +20,12 @@ class SessionStore:
         # Maps user_id -> {"session_id": str, "last_access": datetime}
         logger.info("SessionStore initialized")
 
-    def get_or_create_session(self, user_id: str) -> str:
+    async def get_or_create_session(self, user_id: str, app_name: str = "agents") -> str:
         """Get existing session or create new one for user.
 
         Args:
             user_id: User identifier
+            app_name: Application name for ADK session management
 
         Returns:
             Session ID for the user
@@ -45,13 +46,21 @@ class SessionStore:
             else:
                 logger.info(f"Session expired for user {user_id}, creating new session")
 
-        # Create new session
+        # Create new session in ADK session service
         session_id = f"session-{user_id}-{int(now.timestamp())}"
+
+        # Create session in ADK with proper app_name (async call)
+        await self.session_service.create_session(
+            app_name=app_name,
+            user_id=user_id,
+            session_id=session_id,
+        )
+
         self.user_sessions[user_id] = {
             "session_id": session_id,
             "last_access": now,
         }
-        logger.info(f"Created new session {session_id} for user {user_id}")
+        logger.info(f"Created new session {session_id} for user {user_id} with app_name={app_name}")
         return session_id
 
     def cleanup_expired_sessions(self):

@@ -115,7 +115,7 @@ Be helpful, secure, and efficient!"""
             agent = self._create_agent(user_id)
 
             runner = Runner(
-                app_name="code-execution-app",
+                app_name="agents",  # Must match agent module path
                 agent=agent,
                 session_service=session_service,
             )
