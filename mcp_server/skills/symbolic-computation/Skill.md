@@ -233,3 +233,7 @@ print(f"Check: {A * x}")  # Should equal b
 | Matrices | `Matrix`, `eye`, `zeros`, `ones` |
 | Special | `sin`, `cos`, `exp`, `log`, `sqrt` |
 | Output | `pprint`, `latex`, `preview` |
+
+## Communication Guidelines
+
+**Critical:** Always present any equations in your responses using a markdown-compatible LaTex syntax

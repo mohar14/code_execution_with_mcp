@@ -1,7 +1,5 @@
 """Google ADK Agent lifecycle management with LiteLLM support for Agent API."""
 
-import logging
-
 from cache import ttl_cache
 from config import settings
 from fastmcp.client import Client as FastMCPClient
@@ -9,8 +7,7 @@ from google.adk import Agent, Runner
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class AgentManager:
@@ -61,7 +58,7 @@ class AgentManager:
 
         try:
             # Connect to MCP server using FastMCP client
-            async with FastMCPClient(connection_params={"url": self.mcp_server_url}) as client:
+            async with FastMCPClient(self.mcp_server_url) as client:
                 # Fetch the agent_system_prompt
                 result = await client.get_prompt("agent_system_prompt")
 
@@ -105,6 +102,9 @@ class AgentManager:
         # Fetch instruction prompt from MCP server (with TTL cache)
         instruction = await self._get_instruction_prompt()
 
+        def instruction_provider(ctx):
+            return instruction
+
         # Use LiteLLM wrapper for multi-provider support
         # LiteLLM supports: OpenAI, Anthropic, Google, Cohere, etc.
         # Model format: "provider/model" (e.g., "openai/gpt-4", "anthropic/claude-3-sonnet")
@@ -114,7 +114,7 @@ class AgentManager:
         agent = Agent(
             model=model,
             name=settings.agent_name,
-            instruction=instruction,  # Now using dynamic prompt!
+            instruction=instruction_provider,  # Now using dynamic prompt!
             tools=[toolset],
         )
 

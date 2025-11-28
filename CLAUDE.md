@@ -1,0 +1,1 @@
+- Always use `uv run python ...` for any python commands

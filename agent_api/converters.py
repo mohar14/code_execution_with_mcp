@@ -1,16 +1,13 @@
 """Convert Google ADK Events to OpenAI ChatCompletionChunk format."""
 
 import json
-import logging
 import time
 import uuid
 from collections.abc import AsyncGenerator
 
 from google.adk.events import Event
-
+from loguru import logger
 from models import ChatCompletionChunk, Choice, DeltaContent
-
-logger = logging.getLogger(__name__)
 
 
 def convert_content_event(event: Event, request_id: str, model: str) -> ChatCompletionChunk:
@@ -125,6 +122,7 @@ async def convert_adk_events_to_openai(
     logger.info(f"[NEW CONVERTER] Starting event conversion for request {request_id}")
 
     first_chunk = True
+    previous_event_has_tool_calls = False
 
     try:
         async for event in events:
@@ -141,18 +139,18 @@ async def convert_adk_events_to_openai(
 
             # Extract function calls from event
             function_calls = []
-            if hasattr(event, 'get_function_calls'):
+            if hasattr(event, "get_function_calls"):
                 function_calls = event.get_function_calls()
 
             # If there are function calls, send them as tool calls
             if function_calls:
                 for func_call in function_calls:
                     tool_call = {
-                        "id": getattr(func_call, 'id', f"call_{uuid.uuid4().hex[:12]}"),
+                        "id": getattr(func_call, "id", f"call_{uuid.uuid4().hex[:12]}"),
                         "type": "function",
                         "function": {
-                            "name": getattr(func_call, 'name', 'unknown'),
-                            "arguments": json.dumps(getattr(func_call, 'args', {})),
+                            "name": getattr(func_call, "name", "unknown"),
+                            "arguments": json.dumps(getattr(func_call, "args", {})),
                         },
                     }
                     delta = DeltaContent(tool_calls=[tool_call])
@@ -160,19 +158,28 @@ async def convert_adk_events_to_openai(
                     yield ChatCompletionChunk(
                         id=request_id, created=int(time.time()), model=model, choices=[choice]
                     )
+                    previous_event_has_tool_calls = True
 
             # Extract text content from event (excluding function calls/responses)
-            if hasattr(event, "content") and event.content:
+            if hasattr(event, "content") and event.content and hasattr(event.content, "parts"):
                 # Parse parts to extract just the text
-                if hasattr(event.content, 'parts'):
-                    for part in event.content.parts:
-                        # Only send text parts, skip function calls/responses
-                        if hasattr(part, 'text') and part.text:
+                for part in event.content.parts:
+                    # Only send text parts, skip function calls/responses
+                    if hasattr(part, "text") and part.text:
+                        if not previous_event_has_tool_calls:
                             delta = DeltaContent(content=part.text)
-                            choice = Choice(index=0, delta=delta, finish_reason=None)
-                            yield ChatCompletionChunk(
-                                id=request_id, created=int(time.time()), model=model, choices=[choice]
-                            )
+                        else:
+                            # Get a newline if the last event was a tool call to avoid lack of padding
+                            delta = DeltaContent(content="\n\n" + part.text)
+                        choice = Choice(index=0, delta=delta, finish_reason=None)
+                        logger.debug(f"{delta = } {previous_event_has_tool_calls = }")
+                        yield ChatCompletionChunk(
+                            id=request_id,
+                            created=int(time.time()),
+                            model=model,
+                            choices=[choice],
+                        )
+                        previous_event_has_tool_calls = False
 
             # Note: Tool results are typically included in content events
             # so we handle them as content

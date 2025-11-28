@@ -1,29 +1,22 @@
 """Gradio UI for Code Execution with MCP Agent."""
 
 import json
-import logging
 import os
 import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import AsyncIterator
 
 import gradio as gr
 import httpx
-from openai import AsyncOpenAI
 from dotenv import load_dotenv
+from loguru import logger
+from openai import AsyncOpenAI
 
 # Get project root directory (before loading env)
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
 # Load environment variables
 load_dotenv(PROJECT_ROOT / ".env")
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 # Configuration
 AGENT_API_URL = os.getenv("AGENT_API_URL", "http://localhost:8000")
@@ -32,7 +25,7 @@ DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "anthropic/claude-sonnet-4-5-20250929
 # Initialize OpenAI client
 client = AsyncOpenAI(
     base_url=f"{AGENT_API_URL}/v1",
-    api_key=""  # Not used but required by the SDK
+    api_key="",  # Not used but required by the SDK
 )
 
 # Track which users have initialized containers (persists across chats)
@@ -196,18 +189,20 @@ async def check_health() -> dict:
                     # Note: mcp_server_connected is often false even when working
                     # It only checks at startup, not during active use
                     health_status["agent_api"] = {
-                        "status": "healthy" if response.status_code == 200 else data.get("status", "unknown"),
-                        "message": "Connected"
+                        "status": "healthy"
+                        if response.status_code == 200
+                        else data.get("status", "unknown"),
+                        "message": "Connected",
                     }
                 else:
                     health_status["agent_api"] = {
                         "status": "error",
-                        "message": f"HTTP {response.status_code}: {response.text}"
+                        "message": f"HTTP {response.status_code}: {response.text}",
                     }
             except Exception as e:
                 health_status["agent_api"] = {
                     "status": "error",
-                    "message": f"Connection failed: {str(e)}"
+                    "message": f"Connection failed: {e!s}",
                 }
 
     except Exception as e:
@@ -234,11 +229,11 @@ def format_health_status(health: dict) -> str:
             icon = "🔴"
             color = "#dc3545"
 
-        html += f"<div style='margin: 0.5rem 0;'>"
+        html += "<div style='margin: 0.5rem 0;'>"
         html += f"<span style='color: {color};'>{icon}</span> "
         html += f"<strong>{service.replace('_', ' ').title()}:</strong> "
         html += f"<span>{message}</span>"
-        html += f"</div>"
+        html += "</div>"
 
     html += "</div>"
     return html
@@ -287,7 +282,7 @@ def format_tool_call(tool_name: str, arguments: str) -> str:
 def format_reasoning_step(content: str) -> str:
     """Format reasoning step for display."""
     html = "<div class='reasoning-step'>"
-    html += f"<div><strong>🤔 Agent Reasoning:</strong></div>"
+    html += "<div><strong>🤔 Agent Reasoning:</strong></div>"
     html += f"<div style='margin-top: 0.5rem;'>{content}</div>"
     html += "</div>"
     return html
@@ -319,7 +314,9 @@ def clean_response_text(text: str) -> str:
     return text
 
 
-def create_collapsible_section(title: str, icon: str, content: str, section_id: str, default_open: bool = True) -> str:
+def create_collapsible_section(
+    title: str, icon: str, content: str, section_id: str, default_open: bool = True
+) -> str:
     """Create a collapsible section with HTML."""
     display_style = "block" if default_open else "none"
     toggle_char = "▼" if default_open else "▶"
@@ -349,21 +346,35 @@ def format_docker_action(action: str, details: str = "") -> str:
 
 
 async def chat_with_agent(
-    message: str,
-    history: list[tuple[str, str]],
-    user_id: str
+    message: str, history: list[tuple[str, str]], user_id: str
 ) -> AsyncIterator[tuple[list[tuple[str, str]], str, str, str, str, str, str]]:
     """Chat with the agent and stream responses."""
     global client
 
     if not message.strip():
-        yield history, "", "<em style='color: #999;'>No activity yet...</em>", "<em style='color: #999;'>No activity yet...</em>", "<em style='color: #999;'>No reasoning steps yet...</em>", "<em style='color: #999;'>Ready...</em>", "Please enter a message."
+        yield (
+            history,
+            "",
+            "<em style='color: #999;'>No activity yet...</em>",
+            "<em style='color: #999;'>No activity yet...</em>",
+            "<em style='color: #999;'>No reasoning steps yet...</em>",
+            "<em style='color: #999;'>Ready...</em>",
+            "Please enter a message.",
+        )
         return
 
     # Check if client is initialized
     if client is None:
         error_msg = "Services not initialized. Please wait for startup to complete."
-        yield history, "", "<em style='color: #999;'>No activity yet...</em>", "<em style='color: #999;'>No activity yet...</em>", "<em style='color: #999;'>No reasoning steps yet...</em>", "<em style='color: #999;'>Ready...</em>", f"<div style='color: red;'>{error_msg}</div>"
+        yield (
+            history,
+            "",
+            "<em style='color: #999;'>No activity yet...</em>",
+            "<em style='color: #999;'>No activity yet...</em>",
+            "<em style='color: #999;'>No reasoning steps yet...</em>",
+            "<em style='color: #999;'>Ready...</em>",
+            f"<div style='color: red;'>{error_msg}</div>",
+        )
         return
 
     # Add user message to history
@@ -388,15 +399,11 @@ async def chat_with_agent(
 
     # Show initial container status
     if is_first_execution:
-        docker_activities.append(format_docker_action(
-            "Preparing container",
-            f"User: {user_id}"
-        ))
+        docker_activities.append(format_docker_action("Preparing container", f"User: {user_id}"))
     else:
-        docker_activities.append(format_docker_action(
-            "Container ready",
-            f"✅ Using existing container for {user_id}"
-        ))
+        docker_activities.append(
+            format_docker_action("Container ready", f"✅ Using existing container for {user_id}")
+        )
 
     try:
         # Create chat completion stream
@@ -404,16 +411,36 @@ async def chat_with_agent(
             model=DEFAULT_MODEL,
             messages=[{"role": "user", "content": message}],
             stream=True,
-            user=user_id
+            user=user_id,
         )
 
         # Build organized activity log - returns individual sections for Gradio Accordions
         def build_activity_logs():
-            docker_html = "".join(docker_activities) if docker_activities else "<em style='color: #999;'>No activity yet...</em>"
-            tools_html = "".join(tool_calls_list) if tool_calls_list else "<em style='color: #999;'>No activity yet...</em>"
-            reasoning_html = "".join(reasoning_steps) if reasoning_steps else "<em style='color: #999;'>No reasoning steps yet...</em>"
-            status_html = "".join(status_updates) if status_updates else "<em style='color: #999;'>Ready...</em>"
-            debug_html = "".join(debug_outputs) if debug_outputs else "<em style='color: #999;'>No debug output...</em>"
+            docker_html = (
+                "".join(docker_activities)
+                if docker_activities
+                else "<em style='color: #999;'>No activity yet...</em>"
+            )
+            tools_html = (
+                "".join(tool_calls_list)
+                if tool_calls_list
+                else "<em style='color: #999;'>No activity yet...</em>"
+            )
+            reasoning_html = (
+                "".join(reasoning_steps)
+                if reasoning_steps
+                else "<em style='color: #999;'>No reasoning steps yet...</em>"
+            )
+            status_html = (
+                "".join(status_updates)
+                if status_updates
+                else "<em style='color: #999;'>Ready...</em>"
+            )
+            debug_html = (
+                "".join(debug_outputs)
+                if debug_outputs
+                else "<em style='color: #999;'>No debug output...</em>"
+            )
 
             return docker_html, tools_html, reasoning_html, status_html, debug_html
 
@@ -421,6 +448,7 @@ async def chat_with_agent(
 
         # Process stream
         async for chunk in stream:
+            logger.debug(f"chunk: {chunk.model_dump()}")
             if not chunk.choices:
                 continue
 
@@ -432,7 +460,9 @@ async def chat_with_agent(
                 # Check if this is debug content
                 if is_debug_content(delta.content):
                     # Add to debug section (collapsed by default)
-                    debug_outputs.append(f"<div style='margin: 0.5rem 0; padding: 0.5rem; background: #f5f5f5; border-left: 3px solid #999; font-family: monospace; font-size: 0.85em; white-space: pre-wrap;'>{delta.content}</div>")
+                    debug_outputs.append(
+                        f"<div style='margin: 0.5rem 0; padding: 0.5rem; background: #f5f5f5; border-left: 3px solid #999; font-family: monospace; font-size: 0.85em; white-space: pre-wrap;'>{delta.content}</div>"
+                    )
                 else:
                     # If we haven't seen tool calls yet, this is reasoning/thinking
                     if not seen_first_tool_call and delta.content.strip():
@@ -451,10 +481,7 @@ async def chat_with_agent(
                     tool_id = tool_call.id if tool_call.id else f"tool_{len(tool_calls_buffer)}"
 
                     if tool_id not in tool_calls_buffer:
-                        tool_calls_buffer[tool_id] = {
-                            "name": "",
-                            "arguments": ""
-                        }
+                        tool_calls_buffer[tool_id] = {"name": "", "arguments": ""}
 
                     if tool_call.function:
                         if tool_call.function.name:
@@ -465,7 +492,11 @@ async def chat_with_agent(
             # After processing all tool calls in this chunk, check for complete ones to display
             for tool_id, tool_data in tool_calls_buffer.items():
                 # Only display if we have both name and arguments, and haven't displayed yet
-                if tool_data["name"] and tool_data["arguments"] and tool_id not in displayed_tool_calls:
+                if (
+                    tool_data["name"]
+                    and tool_data["arguments"]
+                    and tool_id not in displayed_tool_calls
+                ):
                     # Check if arguments are complete JSON
                     try:
                         json.loads(tool_data["arguments"])
@@ -481,17 +512,21 @@ async def chat_with_agent(
 
                             # Add any buffered reasoning text before first tool call
                             if current_reasoning_text.strip():
-                                reasoning_steps.append(format_reasoning_step(current_reasoning_text.strip()))
+                                reasoning_steps.append(
+                                    format_reasoning_step(current_reasoning_text.strip())
+                                )
                                 current_reasoning_text = ""
 
                             # For first-time users, show container initialization NOW (before tool execution)
-                            if is_first_execution:
+                            if (
+                                is_first_execution
+                                and docker_activities
+                                and "Preparing container" in docker_activities[0]
+                            ):
                                 # Replace "Preparing container" with "Initializing container"
-                                if docker_activities and "Preparing container" in docker_activities[0]:
-                                    docker_activities[0] = format_docker_action(
-                                        "Initializing container",
-                                        f"User: {user_id}"
-                                    )
+                                docker_activities[0] = format_docker_action(
+                                    "Initializing container", f"User: {user_id}"
+                                )
 
                         # Add to tool calls section
                         tool_calls_list.append(format_tool_call(tool_name, tool_args))
@@ -501,31 +536,32 @@ async def chat_with_agent(
                             try:
                                 args = json.loads(tool_args)
                                 cmd = args.get("command", "")
-                                docker_activities.append(format_docker_action(
-                                    "Executing command",
-                                    f"<code>{cmd}</code>"
-                                ))
-                            except:
+                                docker_activities.append(
+                                    format_docker_action("Executing command", f"<code>{cmd}</code>")
+                                )
+                            except (json.JSONDecodeError, KeyError):
                                 pass
                         elif tool_name == "write_file":
                             try:
                                 args = json.loads(tool_args)
                                 path = args.get("file_path", "")
-                                docker_activities.append(format_docker_action(
-                                    "Writing file",
-                                    f"Path: <code>{path}</code>"
-                                ))
-                            except:
+                                docker_activities.append(
+                                    format_docker_action(
+                                        "Writing file", f"Path: <code>{path}</code>"
+                                    )
+                                )
+                            except (json.JSONDecodeError, KeyError):
                                 pass
                         elif tool_name == "read_file":
                             try:
                                 args = json.loads(tool_args)
                                 path = args.get("file_path", "")
-                                docker_activities.append(format_docker_action(
-                                    "Reading file",
-                                    f"Path: <code>{path}</code>"
-                                ))
-                            except:
+                                docker_activities.append(
+                                    format_docker_action(
+                                        "Reading file", f"Path: <code>{path}</code>"
+                                    )
+                                )
+                            except (json.JSONDecodeError, KeyError):
                                 pass
 
                         yield history, current_response, *build_activity_logs()
@@ -536,17 +572,21 @@ async def chat_with_agent(
             # Handle finish reason
             if choice.finish_reason:
                 if choice.finish_reason == "stop":
-                    status_updates.append("<div style='margin: 1rem 0; padding: 0.5rem; background: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;'>✅ <strong>Completed</strong></div>")
+                    status_updates.append(
+                        "<div style='margin: 1rem 0; padding: 0.5rem; background: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;'>✅ <strong>Completed</strong></div>"
+                    )
 
                     # Mark container as ready after successful completion (first time only)
                     if is_first_execution and seen_first_tool_call:
                         user_containers_initialized.add(user_id)
                         # Update docker status to show container is ready
                         if docker_activities and "Initializing container" in docker_activities[0]:
-                            docker_activities.append(format_docker_action(
-                                "Container ready",
-                                "✅ Successfully initialized and ready for commands"
-                            ))
+                            docker_activities.append(
+                                format_docker_action(
+                                    "Container ready",
+                                    "✅ Successfully initialized and ready for commands",
+                                )
+                            )
 
                 elif choice.finish_reason == "tool_calls":
                     reasoning_steps.append(format_reasoning_step("Processing tool call results..."))
@@ -554,9 +594,11 @@ async def chat_with_agent(
                 yield history, current_response, *build_activity_logs()
 
     except Exception as e:
-        error_msg = f"Error: {str(e)}"
+        error_msg = f"Error: {e!s}"
         logger.error(f"Chat error: {e}", exc_info=True)
-        status_updates.append(f"<div style='margin: 1rem 0; padding: 0.5rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;'>❌ <strong>Error:</strong> {error_msg}</div>")
+        status_updates.append(
+            f"<div style='margin: 1rem 0; padding: 0.5rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;'>❌ <strong>Error:</strong> {error_msg}</div>"
+        )
         yield history, current_response, *build_activity_logs()
 
 
@@ -568,7 +610,15 @@ async def refresh_health() -> str:
 
 def clear_chat() -> tuple[list, str, str, str, str, str, str]:
     """Clear chat history and activity log."""
-    return [], "", "<em style='color: #999;'>No activity yet...</em>", "<em style='color: #999;'>No activity yet...</em>", "<em style='color: #999;'>No reasoning steps yet...</em>", "<em style='color: #999;'>Ready...</em>", "<em style='color: #999;'>No debug output...</em>"
+    return (
+        [],
+        "",
+        "<em style='color: #999;'>No activity yet...</em>",
+        "<em style='color: #999;'>No activity yet...</em>",
+        "<em style='color: #999;'>No reasoning steps yet...</em>",
+        "<em style='color: #999;'>Ready...</em>",
+        "<em style='color: #999;'>No debug output...</em>",
+    )
 
 
 # Create Gradio interface
@@ -618,9 +668,7 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
             gr.Markdown("### 👤 User Session")
             user_id_display = gr.Textbox(
-                label="Your User ID",
-                value=f"user-{uuid.uuid4().hex[:8]}",
-                interactive=False
+                label="Your User ID", value=f"user-{uuid.uuid4().hex[:8]}", interactive=False
             )
             new_session_btn = gr.Button("🔄 New Session", size="sm")
 
@@ -631,18 +679,14 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
     with gr.Row():
         with gr.Column(scale=2):
-            chatbot = gr.Chatbot(
-                label="Conversation",
-                height=500,
-                show_copy_button=True
-            )
+            chatbot = gr.Chatbot(label="Conversation", height=500, show_copy_button=True)
 
             with gr.Row():
                 msg_input = gr.Textbox(
                     label="Your Message",
                     placeholder="Ask me to execute code, analyze data, solve math problems...",
                     lines=3,
-                    scale=4
+                    scale=4,
                 )
                 with gr.Column(scale=1):
                     submit_btn = gr.Button("📤 Send", variant="primary")
@@ -655,7 +699,9 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
             with gr.Accordion("🔧 Tool Calls", open=True):
                 tools_log = gr.HTML(value="<em style='color: #999;'>No activity yet...</em>")
             with gr.Accordion("🤔 Agent Reasoning", open=False):
-                reasoning_log = gr.HTML(value="<em style='color: #999;'>No reasoning steps yet...</em>")
+                reasoning_log = gr.HTML(
+                    value="<em style='color: #999;'>No reasoning steps yet...</em>"
+                )
             with gr.Accordion("✅ Status", open=True):
                 status_log = gr.HTML(value="<em style='color: #999;'>Ready...</em>")
             with gr.Accordion("🔍 Debug/Raw Output", open=False):
@@ -671,46 +717,39 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
             ["Write a bash script to list all .py files in the workspace"],
             ["Generate 100 random numbers and calculate their mean and standard deviation"],
         ],
-        inputs=msg_input
+        inputs=msg_input,
     )
 
     # Event handlers
     async def submit_message(message, history, user_id):
-        async for h, resp, d_log, t_log, r_log, s_log, dbg_log in chat_with_agent(message, history, user_id):
+        async for h, _resp, d_log, t_log, r_log, s_log, dbg_log in chat_with_agent(
+            message, history, user_id
+        ):
             yield h, "", d_log, t_log, r_log, s_log, dbg_log
 
     submit_btn.click(
         fn=submit_message,
         inputs=[msg_input, chatbot, user_id_display],
-        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log]
+        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log],
     )
 
     msg_input.submit(
         fn=submit_message,
         inputs=[msg_input, chatbot, user_id_display],
-        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log]
+        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log],
     )
 
     clear_btn.click(
         fn=clear_chat,
-        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log]
+        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log],
     )
 
-    refresh_btn.click(
-        fn=refresh_health,
-        outputs=health_display
-    )
+    refresh_btn.click(fn=refresh_health, outputs=health_display)
 
-    new_session_btn.click(
-        fn=lambda: f"user-{uuid.uuid4().hex[:8]}",
-        outputs=user_id_display
-    )
+    new_session_btn.click(fn=lambda: f"user-{uuid.uuid4().hex[:8]}", outputs=user_id_display)
 
     # Load health status on startup
-    demo.load(
-        fn=refresh_health,
-        outputs=health_display
-    )
+    demo.load(fn=refresh_health, outputs=health_display)
 
     # Add JavaScript for collapsible sections
     demo.load(
@@ -760,11 +799,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
 
 if __name__ == "__main__":
-
     # Start Gradio UI
     demo.queue()
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False
-    )
+    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)

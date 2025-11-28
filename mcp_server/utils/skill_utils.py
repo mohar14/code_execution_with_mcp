@@ -1,10 +1,9 @@
 """Utility functions for skill management and agent prompt generation."""
 
-import logging
 import re
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 def parse_skill_frontmatter(content: str) -> tuple[dict, str]:

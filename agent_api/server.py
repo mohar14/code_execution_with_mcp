@@ -1,6 +1,5 @@
 """FastAPI server for OpenAI-compatible Agent API."""
 
-import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -13,10 +12,7 @@ from converters import convert_adk_events_to_openai, format_sse, format_sse_done
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from google.genai import types
-
-from agent_manager import AgentManager
-from config import settings
-from converters import convert_adk_events_to_openai, format_sse, format_sse_done
+from loguru import logger
 from models import (
     ChatCompletionRequest,
     HealthResponse,
@@ -24,12 +20,6 @@ from models import (
     ModelList,
 )
 from session_store import SessionStore
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 # Global instances
 agent_manager: AgentManager | None = None
@@ -199,10 +189,7 @@ async def chat_completions(request: ChatCompletionRequest):
     logger.debug(f"User message: {user_message[:100]}...")
 
     # Convert string message to google.genai.types.Content
-    message_content = types.Content(
-        role="user",
-        parts=[types.Part(text=user_message)]
-    )
+    message_content = types.Content(role="user", parts=[types.Part(text=user_message)])
 
     # Stream events
     async def event_generator():

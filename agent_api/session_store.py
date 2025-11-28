@@ -1,12 +1,10 @@
 """Session management for Agent API."""
 
-import logging
 from datetime import datetime, timedelta
 
 from config import settings
 from google.adk.sessions import InMemorySessionService
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class SessionStore:

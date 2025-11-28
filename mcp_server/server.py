@@ -4,12 +4,12 @@ This server exposes the DockerExecutionClient methods as MCP tools,
 allowing AI agents to execute code in isolated Docker containers.
 """
 
-import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
 from docker_client import DockerExecutionClient
 from fastmcp import Context, FastMCP
+from loguru import logger
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from utils import (
@@ -18,13 +18,6 @@ from utils import (
     get_skill,
     list_available_skills,
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
 
 # Global client instance (initialized in lifespan)
 docker_client: DockerExecutionClient | None = None

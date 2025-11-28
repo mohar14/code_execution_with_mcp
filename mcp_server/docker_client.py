@@ -20,7 +20,6 @@ import docker
 from docker.models.containers import Container
 
 
-
 class DockerExecutionClient:
     """Manages Docker containers for secure code execution.
 
@@ -49,7 +48,9 @@ class DockerExecutionClient:
         dirname = os.path.abspath(os.path.dirname(__file__))
         self.image_name = image_name or os.getenv("MCP_EXECUTOR_IMAGE", "mcp-code-executor:latest")
         self.tools_path = tools_path or os.getenv("MCP_TOOLS_PATH", os.path.join(dirname, "tools"))
-        self.skills_path = skills_path or os.getenv("MCP_SKILLS_PATH", os.path.join(dirname, "skills"))
+        self.skills_path = skills_path or os.getenv(
+            "MCP_SKILLS_PATH", os.path.join(dirname, "skills")
+        )
 
         # Initialize Docker client
         self.docker_client = docker.from_env()

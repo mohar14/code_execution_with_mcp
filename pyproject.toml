@@ -12,6 +12,7 @@ dependencies = [
     "gradio>=5.50.0",
     "httpx>=0.28.1",
     "litellm>=1.65.0",
+    "loguru>=0.7.3",
     "mcp>=1.22.0",
     "numpy>=2.3.5",
     "openai>=2.8.1",
