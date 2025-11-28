@@ -122,13 +122,13 @@ async def convert_adk_events_to_openai(
         OpenAI-compatible ChatCompletionChunk objects
     """
     request_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
-    logger.debug(f"Starting event conversion for request {request_id}")
+    logger.info(f"[NEW CONVERTER] Starting event conversion for request {request_id}")
 
     first_chunk = True
 
     try:
         async for event in events:
-            logger.debug(f"Processing event: {type(event).__name__}")
+            logger.info(f"[NEW CONVERTER] Processing event: {type(event).__name__}")
 
             # Send role in first chunk
             if first_chunk:
@@ -139,14 +139,40 @@ async def convert_adk_events_to_openai(
                 )
                 first_chunk = False
 
-            # Determine event type and convert accordingly
-            if hasattr(event, "content") and event.content:
-                # Text content event
-                yield convert_content_event(event, request_id, model)
+            # Extract function calls from event
+            function_calls = []
+            if hasattr(event, 'get_function_calls'):
+                function_calls = event.get_function_calls()
 
-            elif hasattr(event, "tool_call") and event.tool_call:
-                # Tool call event
-                yield convert_tool_call_event(event, request_id, model)
+            # If there are function calls, send them as tool calls
+            if function_calls:
+                for func_call in function_calls:
+                    tool_call = {
+                        "id": getattr(func_call, 'id', f"call_{uuid.uuid4().hex[:12]}"),
+                        "type": "function",
+                        "function": {
+                            "name": getattr(func_call, 'name', 'unknown'),
+                            "arguments": json.dumps(getattr(func_call, 'args', {})),
+                        },
+                    }
+                    delta = DeltaContent(tool_calls=[tool_call])
+                    choice = Choice(index=0, delta=delta, finish_reason=None)
+                    yield ChatCompletionChunk(
+                        id=request_id, created=int(time.time()), model=model, choices=[choice]
+                    )
+
+            # Extract text content from event (excluding function calls/responses)
+            if hasattr(event, "content") and event.content:
+                # Parse parts to extract just the text
+                if hasattr(event.content, 'parts'):
+                    for part in event.content.parts:
+                        # Only send text parts, skip function calls/responses
+                        if hasattr(part, 'text') and part.text:
+                            delta = DeltaContent(content=part.text)
+                            choice = Choice(index=0, delta=delta, finish_reason=None)
+                            yield ChatCompletionChunk(
+                                id=request_id, created=int(time.time()), model=model, choices=[choice]
+                            )
 
             # Note: Tool results are typically included in content events
             # so we handle them as content
