@@ -234,10 +234,10 @@ class TestErrorHandling:
                 },
             )
 
-            assert response.status_code == 400
-            data = response.json()
-            assert "error" in data
-            assert "streaming" in data["error"]["message"].lower()
+            assert response.status_code == 422
+            data = response.text
+            assert "error" in data.lower()
+            assert "input should be true" in data.lower()
 
     @pytest.mark.asyncio
     async def test_empty_messages(self):

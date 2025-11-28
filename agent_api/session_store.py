@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from google.adk.sessions import InMemorySessionService
 
-from agent_api.config import settings
+from config import settings
 
 logger = logging.getLogger(__name__)
 

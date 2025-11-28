@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 
 from google.adk.events import Event
 
-from agent_api.models import ChatCompletionChunk, Choice, DeltaContent
+from models import ChatCompletionChunk, Choice, DeltaContent
 
 logger = logging.getLogger(__name__)
 

@@ -11,16 +11,16 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from google.genai import types
 
-from agent_api.agent_manager import AgentManager
-from agent_api.config import settings
-from agent_api.converters import convert_adk_events_to_openai, format_sse, format_sse_done
-from agent_api.models import (
+from agent_manager import AgentManager
+from config import settings
+from converters import convert_adk_events_to_openai, format_sse, format_sse_done
+from models import (
     ChatCompletionRequest,
     HealthResponse,
     ModelInfo,
     ModelList,
 )
-from agent_api.session_store import SessionStore
+from session_store import SessionStore
 
 # Configure logging
 logging.basicConfig(
@@ -161,7 +161,7 @@ async def chat_completions(request: ChatCompletionRequest):
     Raises:
         HTTPException: If streaming is not enabled or other errors occur
     """
-    # Validate streaming is enabled
+    # Validate streaming is enabled - this should be handled at the pydantic layer
     if not request.stream:
         raise HTTPException(
             status_code=400,
@@ -184,7 +184,7 @@ async def chat_completions(request: ChatCompletionRequest):
     if agent_manager is None:
         raise HTTPException(status_code=500, detail="Agent manager not initialized")
 
-    runner = agent_manager.get_or_create_runner(
+    runner = await agent_manager.get_or_create_runner(
         user_id=user_id, session_service=session_store.session_service
     )
 
@@ -265,12 +265,13 @@ async def root():
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
 
     uvicorn.run(
-        "agent_api.server:app",
+        app=app,
         host=settings.agent_api_host,
         port=settings.agent_api_port,
         log_level="info",
-        reload=True,  # Development only
+        reload=os.getenv("DEV_RELOAD", "false").lower() == "true",  # Development hot reload flag
     )

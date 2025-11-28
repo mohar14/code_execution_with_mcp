@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     mcp_server_url: str = "http://localhost:8989/mcp"
 
     # LiteLLM Model Configuration
-    default_model: str = "gemini/gemini-2.0-flash-exp"
+    default_model: str = "anthropic/claude-sonnet-4-5-20250929"
     # Supported models (LiteLLM format):
     # - OpenAI: "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"
     # - Anthropic: "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"
