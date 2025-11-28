@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # MCP Server Connection
     mcp_server_url: str = "http://localhost:8989/mcp"
+    mcp_server_health_endpoint: str = "http://localhost:8989/health"
 
     # LiteLLM Model Configuration
     default_model: str = "anthropic/claude-sonnet-4-5-20250929"

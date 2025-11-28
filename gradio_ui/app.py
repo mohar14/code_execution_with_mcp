@@ -1,14 +1,9 @@
 """Gradio UI for Code Execution with MCP Agent."""
 
-import atexit
 import json
 import logging
 import os
-import subprocess
-import sys
-import time
 import uuid
-from datetime import datetime
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -31,197 +26,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-AGENT_API_URL = "http://localhost:8000"
-MCP_SERVER_URL = "http://localhost:8989"
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "claude-sonnet-4-5")
+AGENT_API_URL = os.getenv("AGENT_API_URL", "http://localhost:8000")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "anthropic/claude-sonnet-4-5-20250929")
 
-# Global process tracking
-mcp_server_process = None
-agent_api_process = None
-
-# Initialize OpenAI client (will be set after servers start)
-client = None
+# Initialize OpenAI client
+client = AsyncOpenAI(
+    base_url=f"{AGENT_API_URL}/v1",
+    api_key=""  # Not used but required by the SDK
+)
 
 # Track which users have initialized containers (persists across chats)
 user_containers_initialized = set()
 
-
-def start_mcp_server():
-    """Start the MCP server in a subprocess."""
-    global mcp_server_process
-
-    logger.info("Starting MCP Server...")
-
-    # Get Python executable from virtual environment
-    python_exe = sys.executable
-
-    try:
-        # Start MCP server
-        # Set PYTHONPATH to project root so relative imports work
-        env = dict(os.environ)
-        env['PYTHONPATH'] = str(PROJECT_ROOT)
-
-        mcp_server_process = subprocess.Popen(
-            [python_exe, "./mcp_server/server.py"],
-            cwd=PROJECT_ROOT,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1
-        )
-
-        logger.info(f"MCP Server started with PID: {mcp_server_process.pid}")
-
-        # Wait for server to be ready
-        max_wait = 30
-        wait_interval = 1
-        elapsed = 0
-
-        while elapsed < max_wait:
-            try:
-                response = httpx.get(f"{MCP_SERVER_URL}/health", timeout=2.0)
-                if response.status_code == 200:
-                    logger.info("MCP Server is ready!")
-                    return True
-            except:
-                pass
-
-            time.sleep(wait_interval)
-            elapsed += wait_interval
-
-            # Check if process died
-            if mcp_server_process.poll() is not None:
-                logger.error("MCP Server process died during startup")
-                return False
-
-        logger.warning(f"MCP Server did not become ready within {max_wait} seconds")
-        return False
-
-    except Exception as e:
-        logger.error(f"Failed to start MCP Server: {e}")
-        return False
-
-
-def start_agent_api():
-    """Start the Agent API server in a subprocess."""
-    global agent_api_process
-
-    logger.info("Starting Agent API Server...")
-
-    # Get Python executable from virtual environment
-    python_exe = sys.executable
-
-    try:
-        # Start Agent API server
-        # Set PYTHONPATH to project root so imports work
-        env = dict(os.environ)
-        env['PYTHONPATH'] = str(PROJECT_ROOT)
-
-        agent_api_process = subprocess.Popen(
-            [python_exe, "./agent_api/server.py"],
-            cwd=PROJECT_ROOT,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1
-        )
-
-        logger.info(f"Agent API Server started with PID: {agent_api_process.pid}")
-
-        # Wait for server to be ready
-        max_wait = 30
-        wait_interval = 1
-        elapsed = 0
-
-        while elapsed < max_wait:
-            try:
-                response = httpx.get(f"{AGENT_API_URL}/health", timeout=2.0)
-                if response.status_code == 200:
-                    logger.info("Agent API Server is ready!")
-                    return True
-            except:
-                pass
-
-            time.sleep(wait_interval)
-            elapsed += wait_interval
-
-            # Check if process died
-            if agent_api_process.poll() is not None:
-                logger.error("Agent API process died during startup")
-                return False
-
-        logger.warning(f"Agent API did not become ready within {max_wait} seconds")
-        return False
-
-    except Exception as e:
-        logger.error(f"Failed to start Agent API Server: {e}")
-        return False
-
-
-def stop_servers():
-    """Stop all background servers."""
-    global mcp_server_process, agent_api_process
-
-    logger.info("Stopping background servers...")
-
-    if agent_api_process and agent_api_process.poll() is None:
-        logger.info(f"Terminating Agent API Server (PID: {agent_api_process.pid})")
-        agent_api_process.terminate()
-        try:
-            agent_api_process.wait(timeout=5)
-            logger.info("Agent API Server stopped")
-        except subprocess.TimeoutExpired:
-            logger.warning("Agent API Server did not stop gracefully, killing...")
-            agent_api_process.kill()
-
-    if mcp_server_process and mcp_server_process.poll() is None:
-        logger.info(f"Terminating MCP Server (PID: {mcp_server_process.pid})")
-        mcp_server_process.terminate()
-        try:
-            mcp_server_process.wait(timeout=5)
-            logger.info("MCP Server stopped")
-        except subprocess.TimeoutExpired:
-            logger.warning("MCP Server did not stop gracefully, killing...")
-            mcp_server_process.kill()
-
-
-# Register cleanup handler
-atexit.register(stop_servers)
-
-
-def initialize_services():
-    """Initialize all required services."""
-    global client
-
-    logger.info("=" * 60)
-    logger.info("Starting Code Execution with MCP - All Services")
-    logger.info("=" * 60)
-
-    # Start MCP Server first
-    if not start_mcp_server():
-        logger.error("Failed to start MCP Server. Exiting.")
-        sys.exit(1)
-
-    # Start Agent API Server
-    if not start_agent_api():
-        logger.error("Failed to start Agent API Server. Exiting.")
-        stop_servers()
-        sys.exit(1)
-
-    # Initialize OpenAI client
-    client = AsyncOpenAI(
-        base_url=f"{AGENT_API_URL}/v1",
-        api_key="dummy"  # Not used but required by the SDK
-    )
-
-    logger.info("=" * 60)
-    logger.info("All services started successfully!")
-    logger.info(f"MCP Server: {MCP_SERVER_URL}")
-    logger.info(f"Agent API: {AGENT_API_URL}")
-    logger.info(f"Gradio UI will start on: http://0.0.0.0:7860")
-    logger.info("=" * 60)
 
 # Custom CSS for better styling
 CUSTOM_CSS = """
@@ -365,10 +181,9 @@ CUSTOM_CSS = """
 
 
 async def check_health() -> dict:
-    """Check health of Agent API and MCP Server."""
+    """Check health of Agent API."""
     health_status = {
         "agent_api": {"status": "unknown", "message": ""},
-        "mcp_server": {"status": "unknown", "message": ""}
     }
 
     try:
@@ -387,29 +202,10 @@ async def check_health() -> dict:
                 else:
                     health_status["agent_api"] = {
                         "status": "error",
-                        "message": f"HTTP {response.status_code}"
+                        "message": f"HTTP {response.status_code}: {response.text}"
                     }
             except Exception as e:
                 health_status["agent_api"] = {
-                    "status": "error",
-                    "message": f"Connection failed: {str(e)}"
-                }
-
-            # Check MCP Server
-            try:
-                response = await http_client.get(f"{MCP_SERVER_URL}/health", timeout=5.0)
-                if response.status_code == 200:
-                    health_status["mcp_server"] = {
-                        "status": "healthy",
-                        "message": "Connected"
-                    }
-                else:
-                    health_status["mcp_server"] = {
-                        "status": "error",
-                        "message": f"HTTP {response.status_code}"
-                    }
-            except Exception as e:
-                health_status["mcp_server"] = {
                     "status": "error",
                     "message": f"Connection failed: {str(e)}"
                 }
@@ -964,8 +760,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
 
 if __name__ == "__main__":
-    # Initialize all backend services first
-    initialize_services()
 
     # Start Gradio UI
     demo.queue()

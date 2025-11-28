@@ -14,10 +14,10 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from google.genai import types
 
-from agent_api.agent_manager import AgentManager
-from agent_api.config import settings
-from agent_api.converters import convert_adk_events_to_openai, format_sse, format_sse_done
-from agent_api.models import (
+from agent_manager import AgentManager
+from config import settings
+from converters import convert_adk_events_to_openai, format_sse, format_sse_done
+from models import (
     ChatCompletionRequest,
     HealthResponse,
     ModelInfo,
@@ -120,7 +120,7 @@ async def health_check():
     mcp_healthy = False
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{settings.mcp_server_url}/health", timeout=5.0)
+            response = await client.get(settings.mcp_server_health_endpoint, timeout=5.0)
             mcp_healthy = response.status_code == 200
     except Exception as e:
         logger.warning(f"MCP server health check failed: {e}")
