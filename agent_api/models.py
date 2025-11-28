@@ -1,8 +1,8 @@
 """OpenAI-compatible Pydantic models for Agent API."""
 
-from typing import Literal, Optional
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ChatMessage(BaseModel):
@@ -18,17 +18,17 @@ class ChatCompletionRequest(BaseModel):
     model: str
     messages: list[ChatMessage]
     stream: Literal[True] = True  # Only streaming supported
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    user: Optional[str] = None  # User identifier for session management
+    temperature: float | None = None
+    max_tokens: int | None = None
+    user: str | None = None  # User identifier for session management
 
 
 class DeltaContent(BaseModel):
     """Delta content for streaming chunks."""
 
-    role: Optional[str] = None
-    content: Optional[str] = None
-    tool_calls: Optional[list[dict]] = None
+    role: str | None = None
+    content: str | None = None
+    tool_calls: list[dict] | None = None
 
 
 class Choice(BaseModel):
@@ -36,7 +36,7 @@ class Choice(BaseModel):
 
     index: int
     delta: DeltaContent
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
 
 
 class ChatCompletionChunk(BaseModel):
@@ -47,7 +47,7 @@ class ChatCompletionChunk(BaseModel):
     created: int  # Unix timestamp
     model: str
     choices: list[Choice]
-    usage: Optional[dict] = None
+    usage: dict | None = None
 
 
 class ModelInfo(BaseModel):

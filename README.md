@@ -19,18 +19,76 @@ A secure, containerized code execution platform for AI agents with multi-user is
 
 ## Architecture
 
-![Architecture Diagram](https://huggingface.co/spaces/MCP-1st-Birthday/code-execution-with-mcp/blob/refs%2Fpr%2F2/docs/architecture.png)
+```mermaid
+flowchart TB
+    subgraph Frontend["🎨 Frontend Layer"]
+        UI["💬 Gradio UI<br/>━━━━━━━━━━━<br/>👤 User Authentication<br/>📡 Real-time Streaming<br/>📊 Artifact Viewer"]
+    end
 
-<details>
-<summary>View/Edit Diagram Source</summary>
+    subgraph AgentAPI["🤖 Agent API Layer"]
+        API["⚡ OpenAI-Compatible API<br/>━━━━━━━━━━━<br/>🔥 FastAPI + Google ADK<br/>💭 Agent Reasoning Loop<br/>🌊 Streaming Responses"]
+    end
 
-The diagram source is maintained in [generate_diagram.py](generate_diagram.py). To regenerate the diagram after making changes:
+    subgraph MCPServer["🔧 MCP Server Layer"]
+        MCP{"🎯 FastMCP Server<br/>━━━━━━━━━━━<br/>🛠️ Tool Registry<br/>👥 User Context"}
+        T1[["⚙️ execute_bash<br/>Run Commands"]]
+        T2[["📖 read_file<br/>Read Files"]]
+        T3[["✍️ write_file<br/>Write Files"]]
+        T4[["📚 read_docstring<br/>Get Docs"]]
+    end
 
-```bash
-python3 generate_diagram.py
+    subgraph ExecClient["🐳 Execution Client Layer"]
+        CLIENT[("🎮 DockerExecutionClient<br/>━━━━━━━━━━━<br/>📦 Container Manager<br/>⚡ Async Executor<br/>🔐 User Isolation")]
+    end
+
+    subgraph Containers["🏠 Container Isolation Layer"]
+        C1{{"🐍 User Container 1<br/>━━━━━━━━━━━<br/>Python 3.12<br/>👤 Non-root User<br/>📁 /workspace"}}
+        CN{{"🐍 User Container N<br/>━━━━━━━━━━━<br/>Python 3.12<br/>👤 Non-root User<br/>📁 /workspace"}}
+    end
+
+    subgraph Resources["📦 Shared Resources"]
+        TOOLS[["🔨 Tools Directory<br/>🔒 Read-only"]]
+        SKILLS[["✨ Skills Directory<br/>🔒 Read-only"]]
+    end
+
+    UI ==>|"📨 HTTP Requests"| API
+    API ==>|"🔌 MCP Protocol"| MCP
+    MCP -.->|invoke| T1
+    MCP -.->|invoke| T2
+    MCP -.->|invoke| T3
+    MCP -.->|invoke| T4
+    T1 -->|execute| CLIENT
+    T2 -->|execute| CLIENT
+    T3 -->|execute| CLIENT
+    T4 -->|execute| CLIENT
+    CLIENT ==>|"🚀 Creates & Manages"| C1
+    CLIENT ==>|"🚀 Creates & Manages"| CN
+
+    TOOLS -.-o|"📌 mount /tools"| C1
+    TOOLS -.-o|"📌 mount /tools"| CN
+    SKILLS -.-o|"📌 mount /skills"| C1
+    SKILLS -.-o|"📌 mount /skills"| CN
+
+    style UI fill:#e3f2fd,stroke:#1565c0,stroke-width:3px,color:#000
+    style API fill:#fff3e0,stroke:#e65100,stroke-width:3px,color:#000
+    style MCP fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px,color:#000
+    style CLIENT fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px,color:#000
+    style C1 fill:#fff9c4,stroke:#f57f17,stroke-width:3px,color:#000
+    style CN fill:#fff9c4,stroke:#f57f17,stroke-width:3px,color:#000
+    style TOOLS fill:#ffebee,stroke:#c62828,stroke-width:3px,color:#000
+    style SKILLS fill:#fce4ec,stroke:#ad1457,stroke-width:3px,color:#000
+    style T1 fill:#b3e5fc,stroke:#0277bd,stroke-width:2px,color:#000
+    style T2 fill:#b3e5fc,stroke:#0277bd,stroke-width:2px,color:#000
+    style T3 fill:#b3e5fc,stroke:#0277bd,stroke-width:2px,color:#000
+    style T4 fill:#b3e5fc,stroke:#0277bd,stroke-width:2px,color:#000
+
+    style Frontend fill:#e8eaf6,stroke:#3f51b5,stroke-width:3px,stroke-dasharray: 5 5
+    style AgentAPI fill:#fff8e1,stroke:#ff6f00,stroke-width:3px,stroke-dasharray: 5 5
+    style MCPServer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,stroke-dasharray: 5 5
+    style ExecClient fill:#e0f2f1,stroke:#00695c,stroke-width:3px,stroke-dasharray: 5 5
+    style Containers fill:#fffde7,stroke:#f9a825,stroke-width:3px,stroke-dasharray: 5 5
+    style Resources fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5
 ```
-
-</details>
 
 ## Key Features
 

@@ -2,14 +2,13 @@
 
 import logging
 
+from cache import ttl_cache
+from config import settings
 from fastmcp.client import Client as FastMCPClient
 from google.adk import Agent, Runner
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-
-from cache import ttl_cache
-from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +61,7 @@ class AgentManager:
 
         try:
             # Connect to MCP server using FastMCP client
-            async with FastMCPClient(
-                connection_params={"url": self.mcp_server_url}
-            ) as client:
+            async with FastMCPClient(connection_params={"url": self.mcp_server_url}) as client:
                 # Fetch the agent_system_prompt
                 result = await client.get_prompt("agent_system_prompt")
 

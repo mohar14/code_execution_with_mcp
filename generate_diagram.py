@@ -120,7 +120,7 @@ def generate_diagram():
 
     # Generate PNG
     output_png = docs_dir / "architecture.png"
-    print(f"\nGenerating PNG diagram...")
+    print("\nGenerating PNG diagram...")
     try:
         subprocess.run(
             [
@@ -143,7 +143,7 @@ def generate_diagram():
 
     # Generate SVG
     output_svg = docs_dir / "architecture.svg"
-    print(f"\nGenerating SVG diagram...")
+    print("\nGenerating SVG diagram...")
     try:
         subprocess.run(
             [
@@ -165,11 +165,11 @@ def generate_diagram():
     print("\n" + "=" * 80)
     print("SUCCESS! Diagram generated successfully")
     print("=" * 80)
-    print(f"\nFiles created:")
+    print("\nFiles created:")
     print(f"  - {output_png}")
     print(f"  - {output_svg}")
-    print(f"\nAdd to README.md:")
-    print(f'  ![Architecture Diagram](docs/architecture.png)')
+    print("\nAdd to README.md:")
+    print("  ![Architecture Diagram](docs/architecture.png)")
     print("=" * 80 + "\n")
 
     return True

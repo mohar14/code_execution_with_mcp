@@ -8,17 +8,15 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastmcp import FastMCP
-from fastmcp import Context
-
 from docker_client import DockerExecutionClient
-from starlette.responses import JSONResponse
+from fastmcp import Context, FastMCP
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from utils import (
-    list_available_skills,
-    get_skill,
-    generate_skills_section,
     generate_agent_prompt,
+    generate_skills_section,
+    get_skill,
+    list_available_skills,
 )
 
 # Configure logging
@@ -143,7 +141,7 @@ async def execute_bash(
         return {
             "exit_code": -1,
             "stdout": "",
-            "stderr": f"Error: {str(e)}",
+            "stderr": f"Error: {e!s}",
         }
 
 
@@ -326,11 +324,13 @@ async def health_check(request: Request):
     Returns:
         JSON response with server status
     """
-    return JSONResponse({
-        "status": "healthy",
-        "service": "mcp-code-executor",
-        "client_initialized": docker_client is not None,
-    })
+    return JSONResponse(
+        {
+            "status": "healthy",
+            "service": "mcp-code-executor",
+            "client_initialized": docker_client is not None,
+        }
+    )
 
 
 # Skills endpoints
@@ -346,15 +346,20 @@ async def list_skills(request: Request):
     """
     try:
         skills = list_available_skills()
-        return JSONResponse({
-            "skills": skills,
-            "count": len(skills),
-        })
+        return JSONResponse(
+            {
+                "skills": skills,
+                "count": len(skills),
+            }
+        )
     except Exception as e:
         logger.error(f"Error listing skills: {e}")
-        return JSONResponse({
-            "error": str(e),
-        }, status_code=500)
+        return JSONResponse(
+            {
+                "error": str(e),
+            },
+            status_code=500,
+        )
 
 
 @mcp.custom_route("/skills/{skill_name}", methods=["GET"])
@@ -372,14 +377,20 @@ async def get_skill_by_name(request: Request):
         skill_data = get_skill(skill_name)
         return JSONResponse(skill_data)
     except FileNotFoundError as e:
-        return JSONResponse({
-            "error": str(e),
-        }, status_code=404)
+        return JSONResponse(
+            {
+                "error": str(e),
+            },
+            status_code=404,
+        )
     except Exception as e:
         logger.error(f"Error retrieving skill {skill_name}: {e}")
-        return JSONResponse({
-            "error": str(e),
-        }, status_code=500)
+        return JSONResponse(
+            {
+                "error": str(e),
+            },
+            status_code=500,
+        )
 
 
 if __name__ == "__main__":

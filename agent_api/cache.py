@@ -3,7 +3,8 @@
 import functools
 import inspect
 import time
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 T = TypeVar("T")
 

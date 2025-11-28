@@ -9,7 +9,6 @@ These tests require:
 
 import httpx
 import pytest
-from openai import OpenAI
 
 
 class TestHealthEndpoints:
@@ -202,9 +201,7 @@ class TestSessionManagement:
         # Second turn: reference previous context
         stream2 = openai_client.chat.completions.create(
             model=test_model,
-            messages=[
-                {"role": "user", "content": "Now read the file you just created"}
-            ],
+            messages=[{"role": "user", "content": "Now read the file you just created"}],
             stream=True,
             user="test-session-123",  # Same user ID for context
         )

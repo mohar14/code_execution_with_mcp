@@ -7,13 +7,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import JSONResponse, StreamingResponse
-from google.genai import types
-
 from agent_manager import AgentManager
 from config import settings
 from converters import convert_adk_events_to_openai, format_sse, format_sse_done
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse, StreamingResponse
+from google.genai import types
 from models import (
     ChatCompletionRequest,
     HealthResponse,
@@ -85,9 +84,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     Returns:
         JSON response with error details
     """
-    return JSONResponse(
-        status_code=exc.status_code, content={"error": {"message": exc.detail}}
-    )
+    return JSONResponse(status_code=exc.status_code, content={"error": {"message": exc.detail}})
 
 
 @app.exception_handler(Exception)
@@ -142,7 +139,9 @@ async def list_models():
     return ModelList(
         data=[
             ModelInfo(
-                id=settings.default_model, created=int(time.time()), owned_by=settings.get_model_owner()
+                id=settings.default_model,
+                created=int(time.time()),
+                owned_by=settings.get_model_owner(),
             )
         ]
     )
@@ -196,10 +195,7 @@ async def chat_completions(request: ChatCompletionRequest):
     logger.debug(f"User message: {user_message[:100]}...")
 
     # Convert string message to google.genai.types.Content
-    message_content = types.Content(
-        role="user",
-        parts=[types.Part(text=user_message)]
-    )
+    message_content = types.Content(role="user", parts=[types.Part(text=user_message)])
 
     # Stream events
     async def event_generator():
@@ -214,9 +210,7 @@ async def chat_completions(request: ChatCompletionRequest):
             )
 
             # Convert to OpenAI format
-            openai_chunks = convert_adk_events_to_openai(
-                events=adk_events, model=request.model
-            )
+            openai_chunks = convert_adk_events_to_openai(events=adk_events, model=request.model)
 
             # Stream as SSE
             async for chunk in openai_chunks:
@@ -266,6 +260,7 @@ async def root():
 
 if __name__ == "__main__":
     import os
+
     import uvicorn
 
     uvicorn.run(

@@ -228,9 +228,7 @@ class DockerExecutionClient:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _get_docstring)
 
-    async def read_file_docstring(
-        self, user_id: str, file_path: str, function_name: str
-    ) -> str:
+    async def read_file_docstring(self, user_id: str, file_path: str, function_name: str) -> str:
         """Read the docstring of a function from a Python file in the user's container.
 
         Args:

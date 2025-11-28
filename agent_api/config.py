@@ -66,10 +66,10 @@ Be helpful, secure, and efficient!"""
             owner, _ = self.default_model.split("/", 1)
         except:
             owner = default_owner
-        
+
         if owner:
             return owner
         return default_owner
-            
+
 
 settings = Settings()
