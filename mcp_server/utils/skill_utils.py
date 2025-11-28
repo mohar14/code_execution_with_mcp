@@ -17,7 +17,7 @@ def parse_skill_frontmatter(content: str) -> tuple[dict, str]:
         Tuple of (metadata_dict, content_without_frontmatter)
     """
     # Match YAML frontmatter between --- markers
-    pattern = r'^---\s*\n(.*?)\n---\s*\n(.*)$'
+    pattern = r"^---\s*\n(.*?)\n---\s*\n(.*)$"
     match = re.match(pattern, content, re.DOTALL)
 
     if not match:
@@ -27,10 +27,10 @@ def parse_skill_frontmatter(content: str) -> tuple[dict, str]:
 
     # Parse YAML-like frontmatter (simple key: value pairs)
     metadata = {}
-    for line in frontmatter.split('\n'):
+    for line in frontmatter.split("\n"):
         line = line.strip()
-        if ':' in line:
-            key, value = line.split(':', 1)
+        if ":" in line:
+            key, value = line.split(":", 1)
             metadata[key.strip()] = value.strip()
 
     return metadata, body.strip()
@@ -92,12 +92,14 @@ def list_available_skills() -> list[dict]:
                 try:
                     skill_data = get_skill(skill_dir.name)
                     # Return lightweight metadata for listing
-                    skills.append({
-                        "skill_id": skill_data["skill_id"],
-                        "name": skill_data["name"],
-                        "description": skill_data["description"],
-                        "version": skill_data["version"],
-                    })
+                    skills.append(
+                        {
+                            "skill_id": skill_data["skill_id"],
+                            "name": skill_data["name"],
+                            "description": skill_data["description"],
+                            "version": skill_data["version"],
+                        }
+                    )
                 except Exception as e:
                     logger.error(f"Error loading skill {skill_dir.name}: {e}")
 
@@ -114,7 +116,9 @@ def extract_use_cases(content: str) -> str:
         Formatted use cases section, or empty string if not found
     """
     # Look for "When to Use This Skill" section
-    pattern = r'## When to Use This Skill\s*\n\s*(?:Invoke this skill when.*?:)?\s*\n((?:[-*]\s+.+\n?)+)'
+    pattern = (
+        r"## When to Use This Skill\s*\n\s*(?:Invoke this skill when.*?:)?\s*\n((?:[-*]\s+.+\n?)+)"
+    )
     match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
 
     if match:
@@ -138,24 +142,24 @@ def generate_skills_section(skills: list[dict]) -> str:
 
     sections = []
     for skill in skills:
-        skill_id = skill['skill_id']
-        name = skill['name']
-        version = skill['version']
-        description = skill['description']
+        skill_id = skill["skill_id"]
+        name = skill["name"]
+        version = skill["version"]
+        description = skill["description"]
 
         # Get full skill data for dependencies
         try:
             full_skill = get_skill(skill_id)
-            dependencies = full_skill.get('dependencies', 'None')
+            dependencies = full_skill.get("dependencies", "None")
 
             # Extract "When to Use" section from skill content if available
-            content = full_skill.get('content', '')
+            content = full_skill.get("content", "")
             use_cases = extract_use_cases(content)
 
         except Exception as e:
             logger.warning(f"Could not load full skill data for {skill_id}: {e}")
-            dependencies = 'Unknown'
-            use_cases = ''
+            dependencies = "Unknown"
+            use_cases = ""
 
         # Format skill section
         section = f"""---
@@ -170,7 +174,7 @@ def generate_skills_section(skills: list[dict]) -> str:
 """
         sections.append(section)
 
-    return '\n'.join(sections)
+    return "\n".join(sections)
 
 
 def generate_agent_prompt(skills_section: str) -> str:

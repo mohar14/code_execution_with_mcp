@@ -3,9 +3,8 @@
 import logging
 from datetime import datetime, timedelta
 
+from config import settings
 from google.adk.sessions import InMemorySessionService
-
-from agent_api.config import settings
 
 logger = logging.getLogger(__name__)
 

@@ -152,11 +152,11 @@ class TestWriteFileTool:
 
     async def test_write_python_script(self, mcp_client: FastMCPClient):
         """Test writing a Python script with special characters and executing it."""
-        python_code = '''def greet(name):
+        python_code = """def greet(name):
     return f"Hello, {name}!"
 
 print(greet("World"))
-'''
+"""
 
         # Write the Python script
         write_result = await mcp_client.call_tool(
@@ -237,15 +237,13 @@ class TestReadFileTool:
     @pytest.mark.parametrize(
         "offset,line_count",
         [
-            (0, 1),   # First line only
-            (0, 3),   # First three lines
-            (2, 2),   # Lines 3-4
+            (0, 1),  # First line only
+            (0, 3),  # First three lines
+            (2, 2),  # Lines 3-4
             (4, 10),  # Last line (more than available)
         ],
     )
-    async def test_read_pagination(
-        self, mcp_client: FastMCPClient, offset: int, line_count: int
-    ):
+    async def test_read_pagination(self, mcp_client: FastMCPClient, offset: int, line_count: int):
         """Test file reading with various pagination parameters."""
         content = "\n".join([f"Line {i}" for i in range(1, 11)])
 
@@ -347,7 +345,11 @@ class TestReadDocstringTool:
         ],
     )
     async def test_read_various_docstrings(
-        self, mcp_client: FastMCPClient, function_name: str, function_code: str, expected_in_docstring: str
+        self,
+        mcp_client: FastMCPClient,
+        function_name: str,
+        function_code: str,
+        expected_in_docstring: str,
     ):
         """Test reading docstrings from various functions."""
         # Write the function to a file
@@ -457,8 +459,8 @@ class TestUserIsolation:
 
     async def test_different_users_isolated(self, monkeypatch):
         """Test that different users cannot access each other's files."""
-        from fastmcp.client import Client as FastMCPClient
         import server
+        from fastmcp.client import Client as FastMCPClient
 
         # Test with user1
         def mock_get_user_id_user1(ctx):
@@ -558,8 +560,8 @@ This is the skill body.
 
     def test_get_nonexistent_skill(self):
         """Test requesting a skill that doesn't exist."""
-        from utils.skill_utils import get_skill
         import pytest
+        from utils.skill_utils import get_skill
 
         with pytest.raises(FileNotFoundError, match="not found"):
             get_skill("nonexistent-skill")

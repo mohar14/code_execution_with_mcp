@@ -16,4 +16,4 @@ def openai_client():
 @pytest.fixture
 def test_model():
     """Default model for testing."""
-    return "claude-3-5-sonnet-20241022"
+    return "anthropic/claude-sonnet-4-5-20250929"

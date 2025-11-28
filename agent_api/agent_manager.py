@@ -2,12 +2,13 @@
 
 import logging
 
+from cache import ttl_cache
+from config import settings
+from fastmcp.client import Client as FastMCPClient
 from google.adk import Agent, Runner
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-
-from agent_api.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -43,35 +44,53 @@ class AgentManager:
             header_provider=lambda ctx: {"x-user-id": user_id},
         )
 
-    def _get_instruction_prompt(self) -> str:
-        """Get agent instruction/system prompt.
+    @ttl_cache(ttl_seconds=3600)  # 1-hour TTL
+    async def _get_instruction_prompt(self) -> str:
+        """Fetch agent instruction/system prompt from MCP server.
+
+        Attempts to fetch the dynamic prompt with embedded skills from the
+        MCP server. Falls back to the default prompt from settings if:
+        - MCP server is unreachable
+        - Prompt fetch fails
+        - Fetched prompt is empty
 
         Returns:
-            System prompt for the agent
+            System prompt for the agent (either dynamic or fallback)
         """
-        return """You are a code execution assistant with access to secure Docker containers.
+        logger.info("Fetching agent system prompt from MCP server")
 
-You can:
-- Execute bash commands and Python scripts
-- Write files to the workspace
-- Read file contents with pagination
-- Inspect function documentation
+        try:
+            # Connect to MCP server using FastMCP client
+            async with FastMCPClient(connection_params={"url": self.mcp_server_url}) as client:
+                # Fetch the agent_system_prompt
+                result = await client.get_prompt("agent_system_prompt")
 
-Guidelines:
-- Always validate user code before execution
-- Use appropriate timeouts for long-running tasks
-- Handle errors gracefully and provide clear feedback
-- Keep the workspace organized
+                # Extract prompt text from result
+                # Based on test_server.py:567-595, response structure is:
+                # result.messages[0].content.text
+                if result and result.messages and len(result.messages) > 0:
+                    prompt_text = result.messages[0].content.text
 
-Available tools:
-- execute_bash: Run commands in isolated container
-- write_file: Create/overwrite files in workspace
-- read_file: Read file contents (supports pagination)
-- read_docstring: Extract function documentation
+                    # Validate prompt is not empty
+                    if prompt_text and prompt_text.strip():
+                        logger.info(
+                            f"Successfully fetched dynamic prompt from MCP server "
+                            f"({len(prompt_text)} chars)"
+                        )
+                        return prompt_text
+                    else:
+                        logger.warning("MCP server returned empty prompt, using fallback")
+                else:
+                    logger.warning("MCP server returned no messages, using fallback")
 
-Be helpful, secure, and efficient!"""
+        except Exception as e:
+            logger.warning(f"Failed to fetch prompt from MCP server: {e}, using fallback")
 
-    def _create_agent(self, user_id: str) -> Agent:
+        # Fallback to settings
+        logger.info("Using default system prompt from settings")
+        return settings.system_prompt
+
+    async def _create_agent(self, user_id: str) -> Agent:
         """Create Google ADK agent with MCP tools and LiteLLM model routing.
 
         Args:
@@ -83,6 +102,9 @@ Be helpful, secure, and efficient!"""
         logger.info(f"Creating agent for user {user_id} with model {settings.default_model}")
         toolset = self._create_mcp_toolset(user_id)
 
+        # Fetch instruction prompt from MCP server (with TTL cache)
+        instruction = await self._get_instruction_prompt()
+
         # Use LiteLLM wrapper for multi-provider support
         # LiteLLM supports: OpenAI, Anthropic, Google, Cohere, etc.
         # Model format: "provider/model" (e.g., "openai/gpt-4", "anthropic/claude-3-sonnet")
@@ -92,13 +114,13 @@ Be helpful, secure, and efficient!"""
         agent = Agent(
             model=model,
             name=settings.agent_name,
-            instruction=settings.system_prompt,
+            instruction=instruction,  # Now using dynamic prompt!
             tools=[toolset],
         )
 
         return agent
 
-    def get_or_create_runner(
+    async def get_or_create_runner(
         self, user_id: str, session_service: InMemorySessionService
     ) -> Runner:
         """Get existing runner or create new one for user.
@@ -112,7 +134,7 @@ Be helpful, secure, and efficient!"""
         """
         if user_id not in self.runners:
             logger.info(f"Creating new runner for user {user_id}")
-            agent = self._create_agent(user_id)
+            agent = await self._create_agent(user_id)  # Now async!
 
             runner = Runner(
                 app_name="agents",  # Must match agent module path

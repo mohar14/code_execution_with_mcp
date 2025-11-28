@@ -50,5 +50,6 @@ async def cleanup_containers():
 
     # Cleanup after tests complete
     import server
+
     if server.docker_client:
         server.docker_client.cleanup_all()
