@@ -142,7 +142,7 @@ async def list_models():
     return ModelList(
         data=[
             ModelInfo(
-                id=settings.default_model, created=int(time.time()), owned_by="google"
+                id=settings.default_model, created=int(time.time()), owned_by=settings.get_model_owner()
             )
         ]
     )

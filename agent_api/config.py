@@ -57,5 +57,19 @@ Be helpful, secure, and efficient!"""
         env_file = ".env"
         extra = "ignore"
 
+    def get_model_owner(self) -> str:
+        default_owner = "unknown"
+        if not self.default_model:
+            return default_owner
+
+        try:
+            owner, _ = self.default_model.split("/", 1)
+        except:
+            owner = default_owner
+        
+        if owner:
+            return owner
+        return default_owner
+            
 
 settings = Settings()
