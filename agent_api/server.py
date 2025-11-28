@@ -9,6 +9,7 @@ from datetime import datetime
 import httpx
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from google.genai import types
 
 from agent_api.agent_manager import AgentManager
 from agent_api.config import settings
@@ -175,7 +176,8 @@ async def chat_completions(request: ChatCompletionRequest):
     if session_store is None:
         raise HTTPException(status_code=500, detail="Session store not initialized")
 
-    session_id = session_store.get_or_create_session(user_id)
+    # Use "agents" app_name to match the agent module path
+    session_id = await session_store.get_or_create_session(user_id, app_name="agents")
     logger.debug(f"Using session {session_id} for user {user_id}")
 
     # Get runner for user
@@ -193,6 +195,12 @@ async def chat_completions(request: ChatCompletionRequest):
     user_message = request.messages[-1].content
     logger.debug(f"User message: {user_message[:100]}...")
 
+    # Convert string message to google.genai.types.Content
+    message_content = types.Content(
+        role="user",
+        parts=[types.Part(text=user_message)]
+    )
+
     # Stream events
     async def event_generator():
         """Generate Server-Sent Events from ADK agent stream."""
@@ -202,7 +210,7 @@ async def chat_completions(request: ChatCompletionRequest):
             adk_events = runner.run_async(
                 user_id=user_id,
                 session_id=session_id,
-                new_message=user_message,
+                new_message=message_content,
             )
 
             # Convert to OpenAI format

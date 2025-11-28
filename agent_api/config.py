@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     agent_api_port: int = 8000
 
     # MCP Server Connection
-    mcp_server_url: str = "http://localhost:8989"
+    mcp_server_url: str = "http://localhost:8989/mcp"
 
     # LiteLLM Model Configuration
     default_model: str = "gemini/gemini-2.0-flash-exp"

@@ -6,7 +6,7 @@ import time
 import uuid
 from typing import AsyncGenerator
 
-from google.adk import Event
+from google.adk.events import Event
 
 from agent_api.models import ChatCompletionChunk, Choice, DeltaContent
 
