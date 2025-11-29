@@ -386,6 +386,116 @@ async def get_skill_by_name(request: Request):
         )
 
 
+# Artifacts endpoints
+@mcp.custom_route("/{user_id}/artifacts", methods=["GET"])
+async def list_user_artifacts(request: Request):
+    """List all artifacts for a specific user.
+
+    Args:
+        request: Starlette request object (user_id extracted from path)
+
+    Returns:
+        JSON response with list of artifacts and count
+
+    Example Response:
+        {
+            "artifacts": ["report.pdf", "analysis.py", "chart.png"],
+            "count": 3
+        }
+    """
+    user_id = request.path_params.get("user_id")
+    logger.info(f"Listing artifacts for user {user_id}")
+
+    try:
+        artifacts = await docker_client.list_artifacts(user_id=user_id)
+        logger.info(f"Found {len(artifacts)} artifacts for user {user_id}")
+
+        return JSONResponse(
+            {
+                "artifacts": artifacts,
+                "count": len(artifacts),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing artifacts for user {user_id}: {e}")
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500,
+        )
+
+
+@mcp.custom_route("/{user_id}/artifacts/{artifact_id}", methods=["GET"])
+async def get_user_artifact(request: Request):
+    """Retrieve a specific artifact as base64-encoded string.
+
+    Args:
+        request: Starlette request object (user_id and artifact_id from path)
+
+    Returns:
+        JSON response with base64-encoded artifact data
+
+    Example Response:
+        {
+            "artifact_id": "report.pdf",
+            "data": "JVBERi0xLjQKJeLjz9MKMy...",
+            "encoding": "base64"
+        }
+
+    Error Response (404):
+        {
+            "error": "Artifact not found: report.pdf"
+        }
+
+    Error Response (400):
+        {
+            "error": "Artifact 'large.zip' is 52428800 bytes, exceeds limit of 52428800 bytes"
+        }
+    """
+    user_id = request.path_params.get("user_id")
+    artifact_id = request.path_params.get("artifact_id")
+    logger.info(f"Retrieving artifact for user {user_id}: {artifact_id}")
+
+    try:
+        encoded = await docker_client.get_artifact(
+            user_id=user_id,
+            artifact_path=artifact_id,
+        )
+
+        logger.info(f"Successfully retrieved artifact {artifact_id} for user {user_id}")
+        return JSONResponse(
+            {
+                "artifact_id": artifact_id,
+                "data": encoded,
+                "encoding": "base64",
+            }
+        )
+
+    except RuntimeError as e:
+        error_msg = str(e)
+        logger.error(f"Error retrieving artifact for user {user_id}: {error_msg}")
+
+        # Determine appropriate status code
+        if "not found" in error_msg.lower():
+            status_code = 404
+        elif "invalid" in error_msg.lower() or "exceeds limit" in error_msg.lower():
+            status_code = 400
+        else:
+            status_code = 500
+
+        return JSONResponse(
+            {"error": error_msg},
+            status_code=status_code,
+        )
+
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving artifact for user {user_id}: {e}")
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500,
+        )
+
+
 if __name__ == "__main__":
     # Run the MCP server
     mcp.run(transport="streamable-http", port=8989)

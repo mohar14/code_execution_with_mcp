@@ -170,6 +170,62 @@ CUSTOM_CSS = """
     font-size: 0.8em;
     transition: transform 0.3s;
 }
+
+/* Artifact viewer styles */
+.artifacts-container {
+    margin-top: 15px;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+}
+
+.artifacts-header {
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #667eea;
+    color: #333;
+}
+
+.artifacts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.artifact-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 3px solid #667eea;
+    transition: all 0.2s ease;
+}
+
+.artifact-item:hover {
+    background: #e9ecef;
+    transform: translateX(5px);
+}
+
+.artifact-icon {
+    font-size: 1.5em;
+    margin-right: 12px;
+}
+
+.artifact-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.95em;
+}
+
+.artifact-link:hover {
+    text-decoration: underline;
+    color: #5568d3;
+}
 """
 
 
@@ -211,6 +267,29 @@ async def check_health() -> dict:
     return health_status
 
 
+async def fetch_artifacts(user_id: str) -> list[str]:
+    """Fetch list of artifacts for a user from Agent API.
+
+    Args:
+        user_id: User identifier (e.g., "user-a1b2c3d4")
+
+    Returns:
+        List of artifact filenames
+    """
+    try:
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.get(
+                f"{AGENT_API_URL}/artifacts/{user_id}",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("artifacts", [])
+    except Exception as e:
+        logger.error(f"Failed to fetch artifacts: {e}")
+        return []
+
+
 def format_health_status(health: dict) -> str:
     """Format health status for display."""
     html = "<div style='font-family: monospace;'>"
@@ -237,6 +316,79 @@ def format_health_status(health: dict) -> str:
 
     html += "</div>"
     return html
+
+
+def format_artifacts_section(user_id: str, artifacts: list[str]) -> str:
+    """Format artifacts as HTML with clickable download links.
+
+    Args:
+        user_id: User identifier
+        artifacts: List of artifact filenames
+
+    Returns:
+        HTML string with styled artifact list
+    """
+    if not artifacts:
+        return """
+        <div class="info-box" style="margin-top: 10px;">
+            <p>📦 No artifacts generated yet.</p>
+            <p style="font-size: 0.9em; color: #666;">
+                Artifacts created by the agent will appear here.
+            </p>
+        </div>
+        """
+
+    artifact_links = []
+    for artifact in artifacts:
+        download_url = f"{AGENT_API_URL}/artifacts/{user_id}/{artifact}"
+        # Determine icon based on file extension
+        icon = "📄"
+        if artifact.endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg')):
+            icon = "🖼️"
+        elif artifact.endswith(('.pdf',)):
+            icon = "📕"
+        elif artifact.endswith(('.py', '.js', '.ts', '.java', '.cpp')):
+            icon = "💻"
+        elif artifact.endswith(('.csv', '.xlsx', '.json')):
+            icon = "📊"
+
+        artifact_links.append(f"""
+        <div class="artifact-item">
+            <span class="artifact-icon">{icon}</span>
+            <a href="{download_url}"
+               download="{artifact}"
+               class="artifact-link"
+               target="_blank">
+                {artifact}
+            </a>
+        </div>
+        """)
+
+    artifacts_html = "\n".join(artifact_links)
+
+    return f"""
+    <div class="artifacts-container">
+        <div class="artifacts-header">
+            <strong>📦 Generated Artifacts ({len(artifacts)})</strong>
+        </div>
+        <div class="artifacts-list">
+            {artifacts_html}
+        </div>
+    </div>
+    """
+
+
+async def refresh_artifacts_display(user_id: str) -> str:
+    """Refresh the artifacts display for current user.
+
+    Args:
+        user_id: Current user identifier
+
+    Returns:
+        HTML string with updated artifacts
+    """
+    artifacts = await fetch_artifacts(user_id)
+    return format_artifacts_section(user_id, artifacts)
 
 
 async def parse_stream_event(line: str) -> dict | None:
@@ -347,7 +499,7 @@ def format_docker_action(action: str, details: str = "") -> str:
 
 async def chat_with_agent(
     message: str, history: list[tuple[str, str]], user_id: str
-) -> AsyncIterator[tuple[list[tuple[str, str]], str, str, str, str, str, str]]:
+) -> AsyncIterator[tuple[list[tuple[str, str]], str, str, str, str, str]]:
     """Chat with the agent and stream responses."""
     global client
 
@@ -357,9 +509,8 @@ async def chat_with_agent(
             "",
             "<em style='color: #999;'>No activity yet...</em>",
             "<em style='color: #999;'>No activity yet...</em>",
-            "<em style='color: #999;'>No reasoning steps yet...</em>",
             "<em style='color: #999;'>Ready...</em>",
-            "Please enter a message.",
+            format_artifacts_section("", []),
         )
         return
 
@@ -371,9 +522,8 @@ async def chat_with_agent(
             "",
             "<em style='color: #999;'>No activity yet...</em>",
             "<em style='color: #999;'>No activity yet...</em>",
-            "<em style='color: #999;'>No reasoning steps yet...</em>",
-            "<em style='color: #999;'>Ready...</em>",
             f"<div style='color: red;'>{error_msg}</div>",
+            format_artifacts_section("", []),
         )
         return
 
@@ -383,15 +533,12 @@ async def chat_with_agent(
     # Initialize tracking with separate sections
     docker_activities = []
     tool_calls_list = []
-    reasoning_steps = []
     status_updates = []
-    debug_outputs = []
 
     current_response = ""
     tool_calls_buffer = {}
     displayed_tool_calls = set()  # Track which tool calls we've already displayed
     seen_first_tool_call = False  # Track if we've seen any tool calls
-    current_reasoning_text = ""  # Buffer for text before tool calls (represents reasoning)
 
     # Check if this user already has an initialized container
     global user_containers_initialized
@@ -426,25 +573,15 @@ async def chat_with_agent(
                 if tool_calls_list
                 else "<em style='color: #999;'>No activity yet...</em>"
             )
-            reasoning_html = (
-                "".join(reasoning_steps)
-                if reasoning_steps
-                else "<em style='color: #999;'>No reasoning steps yet...</em>"
-            )
             status_html = (
                 "".join(status_updates)
                 if status_updates
                 else "<em style='color: #999;'>Ready...</em>"
             )
-            debug_html = (
-                "".join(debug_outputs)
-                if debug_outputs
-                else "<em style='color: #999;'>No debug output...</em>"
-            )
 
-            return docker_html, tools_html, reasoning_html, status_html, debug_html
+            return docker_html, tools_html, status_html
 
-        yield history, current_response, *build_activity_logs()
+        yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
 
         # Process stream
         async for chunk in stream:
@@ -457,23 +594,14 @@ async def chat_with_agent(
 
             # Handle content (agent's response)
             if delta.content:
-                # Check if this is debug content
-                if is_debug_content(delta.content):
-                    # Add to debug section (collapsed by default)
-                    debug_outputs.append(
-                        f"<div style='margin: 0.5rem 0; padding: 0.5rem; background: #f5f5f5; border-left: 3px solid #999; font-family: monospace; font-size: 0.85em; white-space: pre-wrap;'>{delta.content}</div>"
-                    )
-                else:
-                    # If we haven't seen tool calls yet, this is reasoning/thinking
-                    if not seen_first_tool_call and delta.content.strip():
-                        current_reasoning_text += delta.content
-
+                # Skip debug content, don't display it
+                if not is_debug_content(delta.content):
                     # Add to chat response
                     current_response += delta.content
                     # Update the last message in history
                     history[-1] = (message, current_response)
 
-                yield history, current_response, *build_activity_logs()
+                yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
 
             # Handle tool calls
             if delta.tool_calls:
@@ -506,16 +634,9 @@ async def chat_with_agent(
                         tool_name = tool_data["name"]
                         tool_args = tool_data["arguments"]
 
-                        # Mark that we've seen a tool call (stops reasoning capture)
+                        # Mark that we've seen a tool call
                         if not seen_first_tool_call:
                             seen_first_tool_call = True
-
-                            # Add any buffered reasoning text before first tool call
-                            if current_reasoning_text.strip():
-                                reasoning_steps.append(
-                                    format_reasoning_step(current_reasoning_text.strip())
-                                )
-                                current_reasoning_text = ""
 
                             # For first-time users, show container initialization NOW (before tool execution)
                             if (
@@ -564,7 +685,7 @@ async def chat_with_agent(
                             except (json.JSONDecodeError, KeyError):
                                 pass
 
-                        yield history, current_response, *build_activity_logs()
+                        yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
                     except json.JSONDecodeError:
                         # Arguments not complete yet, wait for more chunks
                         pass
@@ -588,10 +709,12 @@ async def chat_with_agent(
                                 )
                             )
 
-                elif choice.finish_reason == "tool_calls":
-                    reasoning_steps.append(format_reasoning_step("Processing tool call results..."))
-
-                yield history, current_response, *build_activity_logs()
+                # Refresh artifacts on completion
+                if choice.finish_reason == "stop":
+                    artifacts_html = await refresh_artifacts_display(user_id)
+                    yield history, current_response, *build_activity_logs(), artifacts_html
+                else:
+                    yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
 
     except Exception as e:
         error_msg = f"Error: {e!s}"
@@ -599,7 +722,7 @@ async def chat_with_agent(
         status_updates.append(
             f"<div style='margin: 1rem 0; padding: 0.5rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;'>❌ <strong>Error:</strong> {error_msg}</div>"
         )
-        yield history, current_response, *build_activity_logs()
+        yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
 
 
 async def refresh_health() -> str:
@@ -608,17 +731,27 @@ async def refresh_health() -> str:
     return format_health_status(health)
 
 
-def clear_chat() -> tuple[list, str, str, str, str, str, str]:
+def clear_chat() -> tuple[list, str, str, str, str, str]:
     """Clear chat history and activity log."""
     return (
         [],
         "",
         "<em style='color: #999;'>No activity yet...</em>",
         "<em style='color: #999;'>No activity yet...</em>",
-        "<em style='color: #999;'>No reasoning steps yet...</em>",
         "<em style='color: #999;'>Ready...</em>",
-        "<em style='color: #999;'>No debug output...</em>",
+        format_artifacts_section("", []),
     )
+
+
+def new_session_and_clear() -> tuple[str, list, str, str, str, str, str]:
+    """Create new session with new user ID and clear all chat/activity logs.
+
+    Returns:
+        Tuple of (new_user_id, cleared_chat_outputs...)
+    """
+    new_user_id = f"user-{uuid.uuid4().hex[:8]}"
+    cleared = clear_chat()
+    return (new_user_id, *cleared)
 
 
 # Create Gradio interface
@@ -698,14 +831,25 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
                 docker_log = gr.HTML(value="<em style='color: #999;'>No activity yet...</em>")
             with gr.Accordion("🔧 Tool Calls", open=True):
                 tools_log = gr.HTML(value="<em style='color: #999;'>No activity yet...</em>")
-            with gr.Accordion("🤔 Agent Reasoning", open=False):
-                reasoning_log = gr.HTML(
-                    value="<em style='color: #999;'>No reasoning steps yet...</em>"
-                )
             with gr.Accordion("✅ Status", open=True):
                 status_log = gr.HTML(value="<em style='color: #999;'>Ready...</em>")
-            with gr.Accordion("🔍 Debug/Raw Output", open=False):
-                debug_log = gr.HTML(value="<em style='color: #999;'>No debug output...</em>")
+            with gr.Accordion("📦 Generated Artifacts", open=False):
+                gr.Markdown(
+                    """
+                    View and download files created by the agent during execution.
+                    Click any artifact to download it to your machine.
+                    """
+                )
+                with gr.Row():
+                    refresh_artifacts_btn = gr.Button(
+                        "🔄 Refresh Artifacts",
+                        size="sm",
+                        variant="secondary"
+                    )
+                artifacts_display = gr.HTML(
+                    value=format_artifacts_section("", []),
+                    label="Artifacts"
+                )
 
     # Examples
     gr.Markdown("### 💡 Example Queries")
@@ -722,31 +866,41 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
     # Event handlers
     async def submit_message(message, history, user_id):
-        async for h, _resp, d_log, t_log, r_log, s_log, dbg_log in chat_with_agent(
+        async for h, _resp, d_log, t_log, s_log, a_display in chat_with_agent(
             message, history, user_id
         ):
-            yield h, "", d_log, t_log, r_log, s_log, dbg_log
+            yield h, "", d_log, t_log, s_log, a_display
 
     submit_btn.click(
         fn=submit_message,
         inputs=[msg_input, chatbot, user_id_display],
-        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log],
+        outputs=[chatbot, msg_input, docker_log, tools_log, status_log, artifacts_display],
     )
 
     msg_input.submit(
         fn=submit_message,
         inputs=[msg_input, chatbot, user_id_display],
-        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log],
+        outputs=[chatbot, msg_input, docker_log, tools_log, status_log, artifacts_display],
     )
 
     clear_btn.click(
         fn=clear_chat,
-        outputs=[chatbot, msg_input, docker_log, tools_log, reasoning_log, status_log, debug_log],
+        outputs=[chatbot, msg_input, docker_log, tools_log, status_log, artifacts_display],
     )
 
     refresh_btn.click(fn=refresh_health, outputs=health_display)
 
-    new_session_btn.click(fn=lambda: f"user-{uuid.uuid4().hex[:8]}", outputs=user_id_display)
+    new_session_btn.click(
+        fn=new_session_and_clear,
+        outputs=[user_id_display, chatbot, msg_input, docker_log, tools_log, status_log, artifacts_display]
+    )
+
+    # Refresh artifacts button
+    refresh_artifacts_btn.click(
+        fn=refresh_artifacts_display,
+        inputs=[user_id_display],
+        outputs=[artifacts_display]
+    )
 
     # Load health status on startup
     demo.load(fn=refresh_health, outputs=health_display)

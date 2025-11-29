@@ -7,6 +7,7 @@ Environment Variables:
     MCP_EXECUTOR_IMAGE: Docker image name (default: mcp-code-executor:latest)
     MCP_TOOLS_PATH: Path to tools directory (default: ./tools)
     MCP_SKILLS_PATH: Path to skills directory (default: ./skills)
+    MCP_ARTIFACT_SIZE_LIMIT_MB: Max artifact file size in MB (default: 50)
 """
 
 import asyncio
@@ -51,6 +52,11 @@ class DockerExecutionClient:
         self.skills_path = skills_path or os.getenv(
             "MCP_SKILLS_PATH", os.path.join(dirname, "skills")
         )
+
+        # Configure artifact size limit
+        default_size_limit_mb = 50
+        size_limit_mb = int(os.getenv("MCP_ARTIFACT_SIZE_LIMIT_MB", default_size_limit_mb))
+        self.artifact_size_limit_bytes = size_limit_mb * 1024 * 1024
 
         # Initialize Docker client
         self.docker_client = docker.from_env()
@@ -262,6 +268,100 @@ class DockerExecutionClient:
             return stdout.strip()
         else:
             raise RuntimeError(f"Failed to read docstring from {file_path}: {stderr}")
+
+    async def list_artifacts(self, user_id: str) -> list[str]:
+        """List all artifact files for a specific user.
+
+        Lists files in the /artifacts/ directory. Only returns files that exist
+        directly in /artifacts/ (no nested directories).
+
+        Args:
+            user_id: Unique identifier for the user
+
+        Returns:
+            List of filenames (without paths) in /artifacts/, sorted alphabetically.
+            Empty list if directory is empty or doesn't exist.
+
+        Raises:
+            RuntimeError: If unable to execute the list command
+        """
+        # Use find to list only regular files directly in /artifacts/
+        command = "find /artifacts/ -maxdepth 1 -type f -printf '%f\\n'"
+
+        exit_code, stdout, stderr = await self.execute_bash(user_id, command)
+
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to list artifacts: {stderr}")
+
+        if not stdout.strip():
+            return []
+
+        # Parse and sort filenames
+        artifacts = [f.strip() for f in stdout.strip().split('\n') if f.strip()]
+        return sorted(artifacts)
+
+    async def get_artifact(self, user_id: str, artifact_path: str) -> str:
+        """Retrieve an artifact file encoded as base64.
+
+        Reads a file from /artifacts/ and returns its base64-encoded content.
+        Supports binary and text files. Performs security and size validation.
+
+        Args:
+            user_id: Unique identifier for the user
+            artifact_path: Filename only (e.g., 'report.pdf', not '/artifacts/report.pdf')
+
+        Returns:
+            Base64-encoded string containing the artifact data
+
+        Raises:
+            RuntimeError: If file doesn't exist
+            RuntimeError: If path traversal attempt detected (nested paths)
+            RuntimeError: If file exceeds size limit
+            RuntimeError: If unable to read file
+        """
+        # Step 1: Path validation (security)
+        if "/" in artifact_path or "\\" in artifact_path:
+            raise RuntimeError(
+                f"Invalid artifact path '{artifact_path}': "
+                "must be a filename, not a path (no '/' or '\\' allowed)"
+            )
+        if artifact_path.startswith("."):
+            raise RuntimeError(
+                f"Invalid artifact path '{artifact_path}': cannot start with '.'"
+            )
+
+        # Step 2: File existence check
+        exit_code, stdout, _ = await self.execute_bash(
+            user_id,
+            f"test -f /artifacts/{artifact_path} && echo 'exists'"
+        )
+        if exit_code != 0 or "exists" not in stdout:
+            raise RuntimeError(f"Artifact not found: {artifact_path}")
+
+        # Step 3: Size check
+        exit_code, size_str, stderr = await self.execute_bash(
+            user_id,
+            f"wc -c < /artifacts/{artifact_path}"
+        )
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to check artifact size: {stderr}")
+
+        size_bytes = int(size_str.strip())
+        if size_bytes > self.artifact_size_limit_bytes:
+            raise RuntimeError(
+                f"Artifact '{artifact_path}' is {size_bytes} bytes, "
+                f"exceeds limit of {self.artifact_size_limit_bytes} bytes"
+            )
+
+        # Step 4: Read and encode as base64
+        exit_code, stdout, stderr = await self.execute_bash(
+            user_id,
+            f"base64 -w 0 /artifacts/{artifact_path}"
+        )
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to encode artifact: {stderr}")
+
+        return stdout.strip()
 
     def stop_container(self, user_id: str) -> None:
         """Stop a user's container.

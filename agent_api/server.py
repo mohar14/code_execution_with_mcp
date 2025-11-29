@@ -1,16 +1,20 @@
 """FastAPI server for OpenAI-compatible Agent API."""
 
+import base64
+import os
+import tempfile
 import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 import httpx
 from agent_manager import AgentManager
 from config import settings
 from converters import convert_adk_events_to_openai, format_sse, format_sse_done
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from google.genai import types
 from loguru import logger
 from models import (
@@ -252,9 +256,120 @@ async def root():
     }
 
 
-if __name__ == "__main__":
-    import os
+@app.get("/artifacts/{user_id}")
+async def list_artifacts(user_id: str):
+    """List all artifacts for a specific user.
 
+    Args:
+        user_id: User identifier
+
+    Returns:
+        JSON response with list of artifact paths
+
+    Example Response:
+        {
+            "artifacts": ["report.pdf", "analysis.py", "chart.png"],
+            "count": 3
+        }
+
+    Raises:
+        HTTPException: If MCP server request fails
+    """
+    try:
+        # Get MCP server base URL from health endpoint config
+        mcp_base = settings.mcp_server_health_endpoint.replace("/health", "")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{mcp_base}/{user_id}/artifacts",
+                timeout=10.0
+            )
+            response.raise_for_status()
+
+            # Return the artifacts list from MCP response
+            data = response.json()
+            return {"artifacts": data.get("artifacts", []), "count": data.get("count", 0)}
+
+    except httpx.HTTPError as e:
+        logger.error(f"Failed to list artifacts for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list artifacts: {str(e)}"
+        )
+
+
+@app.get("/artifacts/{user_id}/{artifact_id}")
+async def download_artifact(user_id: str, artifact_id: str, background_tasks: BackgroundTasks):
+    """Download a specific artifact file.
+
+    Args:
+        user_id: User identifier
+        artifact_id: Artifact filename
+        background_tasks: FastAPI background tasks for cleanup
+
+    Returns:
+        FileResponse with decoded artifact data
+
+    Raises:
+        HTTPException: If artifact not found or retrieval fails
+    """
+    temp_path = None
+    try:
+        # Get MCP server base URL from health endpoint config
+        mcp_base = settings.mcp_server_health_endpoint.replace("/health", "")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{mcp_base}/{user_id}/artifacts/{artifact_id}",
+                timeout=30.0
+            )
+            response.raise_for_status()
+
+            # Extract base64 data from MCP response
+            data = response.json()
+            base64_data = data.get("data", "")
+
+            # Decode base64 to bytes
+            decoded_bytes = base64.b64decode(base64_data)
+
+            # Write to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{artifact_id}") as temp_file:
+                temp_file.write(decoded_bytes)
+                temp_path = temp_file.name
+
+            # Schedule cleanup after response is sent
+            background_tasks.add_task(os.unlink, temp_path)
+
+            # Return as downloadable file
+            return FileResponse(
+                path=temp_path,
+                filename=artifact_id,
+                media_type="application/octet-stream"
+            )
+
+    except httpx.HTTPStatusError as e:
+        # Clean up temp file if error occurs
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"Artifact not found: {artifact_id}")
+        elif e.response.status_code == 400:
+            raise HTTPException(status_code=400, detail=str(e))
+        else:
+            logger.error(f"Failed to download artifact {artifact_id} for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to download artifact")
+
+    except Exception as e:
+        # Clean up temp file if error occurs
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+        logger.error(f"Error downloading artifact {artifact_id} for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to download artifact: {str(e)}")
+
+
+if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
