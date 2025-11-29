@@ -19,7 +19,7 @@ A secure, containerized code execution platform for AI agents with multi-user is
 
 ## Architecture
 
-[architecture](./docs/architecture.png)
+![architecture](./docs/architecture.png)
 
 ## Key Features
 
