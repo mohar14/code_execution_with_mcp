@@ -297,7 +297,7 @@ class DockerExecutionClient:
             return []
 
         # Parse and sort filenames
-        artifacts = [f.strip() for f in stdout.strip().split('\n') if f.strip()]
+        artifacts = [f.strip() for f in stdout.strip().split("\n") if f.strip()]
         return sorted(artifacts)
 
     async def get_artifact(self, user_id: str, artifact_path: str) -> str:
@@ -326,22 +326,18 @@ class DockerExecutionClient:
                 "must be a filename, not a path (no '/' or '\\' allowed)"
             )
         if artifact_path.startswith("."):
-            raise RuntimeError(
-                f"Invalid artifact path '{artifact_path}': cannot start with '.'"
-            )
+            raise RuntimeError(f"Invalid artifact path '{artifact_path}': cannot start with '.'")
 
         # Step 2: File existence check
         exit_code, stdout, _ = await self.execute_bash(
-            user_id,
-            f"test -f /artifacts/{artifact_path} && echo 'exists'"
+            user_id, f"test -f /artifacts/{artifact_path} && echo 'exists'"
         )
         if exit_code != 0 or "exists" not in stdout:
             raise RuntimeError(f"Artifact not found: {artifact_path}")
 
         # Step 3: Size check
         exit_code, size_str, stderr = await self.execute_bash(
-            user_id,
-            f"wc -c < /artifacts/{artifact_path}"
+            user_id, f"wc -c < /artifacts/{artifact_path}"
         )
         if exit_code != 0:
             raise RuntimeError(f"Failed to check artifact size: {stderr}")
@@ -355,8 +351,7 @@ class DockerExecutionClient:
 
         # Step 4: Read and encode as base64
         exit_code, stdout, stderr = await self.execute_bash(
-            user_id,
-            f"base64 -w 0 /artifacts/{artifact_path}"
+            user_id, f"base64 -w 0 /artifacts/{artifact_path}"
         )
         if exit_code != 0:
             raise RuntimeError(f"Failed to encode artifact: {stderr}")

@@ -7,7 +7,6 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from pathlib import Path
 
 import httpx
 from agent_manager import AgentManager
@@ -280,10 +279,7 @@ async def list_artifacts(user_id: str):
         mcp_base = settings.mcp_server_health_endpoint.replace("/health", "")
 
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{mcp_base}/{user_id}/artifacts",
-                timeout=10.0
-            )
+            response = await client.get(f"{mcp_base}/{user_id}/artifacts", timeout=10.0)
             response.raise_for_status()
 
             # Return the artifacts list from MCP response
@@ -292,10 +288,7 @@ async def list_artifacts(user_id: str):
 
     except httpx.HTTPError as e:
         logger.error(f"Failed to list artifacts for user {user_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list artifacts: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list artifacts: {e!s}")
 
 
 @app.get("/artifacts/{user_id}/{artifact_id}")
@@ -320,8 +313,7 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
 
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{mcp_base}/{user_id}/artifacts/{artifact_id}",
-                timeout=30.0
+                f"{mcp_base}/{user_id}/artifacts/{artifact_id}", timeout=30.0
             )
             response.raise_for_status()
 
@@ -342,9 +334,7 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
 
             # Return as downloadable file
             return FileResponse(
-                path=temp_path,
-                filename=artifact_id,
-                media_type="application/octet-stream"
+                path=temp_path, filename=artifact_id, media_type="application/octet-stream"
             )
 
     except httpx.HTTPStatusError as e:
@@ -366,7 +356,7 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
             os.unlink(temp_path)
 
         logger.error(f"Error downloading artifact {artifact_id} for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to download artifact: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to download artifact: {e!s}")
 
 
 if __name__ == "__main__":

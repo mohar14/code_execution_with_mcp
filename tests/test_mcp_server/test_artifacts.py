@@ -2,12 +2,13 @@
 
 import base64
 import os
+
+# Add project root to path
+import sys
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-# Add project root to path
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "mcp_server"))
 
 from docker_client import DockerExecutionClient
@@ -19,7 +20,7 @@ class TestListArtifacts:
     @pytest.fixture
     def docker_client(self):
         """Create a DockerExecutionClient with mocked Docker."""
-        with patch('docker.from_env'):
+        with patch("docker.from_env"):
             client = DockerExecutionClient()
             # Mock the execute_bash method
             client.execute_bash = AsyncMock()
@@ -34,8 +35,7 @@ class TestListArtifacts:
 
         assert result == []
         docker_client.execute_bash.assert_called_once_with(
-            "test-user",
-            "find /artifacts/ -maxdepth 1 -type f -printf '%f\\n'"
+            "test-user", "find /artifacts/ -maxdepth 1 -type f -printf '%f\\n'"
         )
 
     async def test_list_artifacts_single_file(self, docker_client):
@@ -86,7 +86,7 @@ class TestGetArtifact:
     @pytest.fixture
     def docker_client(self):
         """Create a DockerExecutionClient with mocked Docker and size limit."""
-        with patch('docker.from_env'):
+        with patch("docker.from_env"):
             # Set a small size limit for testing (1MB)
             with patch.dict(os.environ, {"MCP_ARTIFACT_SIZE_LIMIT_MB": "1"}):
                 client = DockerExecutionClient()
@@ -190,7 +190,7 @@ class TestGetArtifact:
     async def test_get_artifact_binary_file(self, docker_client):
         """Test getting a binary file (like an image)."""
         # Simulate a small binary file
-        binary_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
+        binary_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
         encoded_content = base64.b64encode(binary_data).decode()
 
         docker_client.execute_bash.side_effect = [
@@ -224,19 +224,22 @@ class TestArtifactSizeLimitConfiguration:
 
     def test_default_size_limit(self):
         """Test that default size limit is 50MB."""
-        with patch('docker.from_env'):
+        with patch("docker.from_env"):
             client = DockerExecutionClient()
             assert client.artifact_size_limit_bytes == 50 * 1024 * 1024
 
     def test_custom_size_limit(self):
         """Test setting custom size limit via environment variable."""
-        with patch('docker.from_env'), patch.dict(os.environ, {"MCP_ARTIFACT_SIZE_LIMIT_MB": "100"}):
+        with (
+            patch("docker.from_env"),
+            patch.dict(os.environ, {"MCP_ARTIFACT_SIZE_LIMIT_MB": "100"}),
+        ):
             client = DockerExecutionClient()
             assert client.artifact_size_limit_bytes == 100 * 1024 * 1024
 
     def test_small_size_limit(self):
         """Test setting a small size limit (1MB)."""
-        with patch('docker.from_env'), patch.dict(os.environ, {"MCP_ARTIFACT_SIZE_LIMIT_MB": "1"}):
+        with patch("docker.from_env"), patch.dict(os.environ, {"MCP_ARTIFACT_SIZE_LIMIT_MB": "1"}):
             client = DockerExecutionClient()
             assert client.artifact_size_limit_bytes == 1 * 1024 * 1024
 
@@ -247,37 +250,43 @@ class TestArtifactSecurityValidation:
     @pytest.fixture
     def docker_client(self):
         """Create a DockerExecutionClient with mocked Docker."""
-        with patch('docker.from_env'):
+        with patch("docker.from_env"):
             client = DockerExecutionClient()
             client.execute_bash = AsyncMock()
             return client
 
-    @pytest.mark.parametrize("malicious_path", [
-        "../../../etc/passwd",
-        "../../secrets.txt",
-        "./config/database.yml",
-        ".ssh/id_rsa",
-        ".env",
-        "subdirectory/file.txt",
-        "path/to/file",
-        "..\\windows\\system32",
-        ".bashrc",
-        ".gitignore",
-    ])
+    @pytest.mark.parametrize(
+        "malicious_path",
+        [
+            "../../../etc/passwd",
+            "../../secrets.txt",
+            "./config/database.yml",
+            ".ssh/id_rsa",
+            ".env",
+            "subdirectory/file.txt",
+            "path/to/file",
+            "..\\windows\\system32",
+            ".bashrc",
+            ".gitignore",
+        ],
+    )
     async def test_reject_malicious_paths(self, docker_client, malicious_path):
         """Test that various malicious path patterns are rejected."""
         with pytest.raises(RuntimeError, match="Invalid artifact path"):
             await docker_client.get_artifact("test-user", malicious_path)
 
-    @pytest.mark.parametrize("valid_filename", [
-        "report.pdf",
-        "analysis.py",
-        "chart.png",
-        "data.json",
-        "output.txt",
-        "results_2024.csv",
-        "my-file.html",
-    ])
+    @pytest.mark.parametrize(
+        "valid_filename",
+        [
+            "report.pdf",
+            "analysis.py",
+            "chart.png",
+            "data.json",
+            "output.txt",
+            "results_2024.csv",
+            "my-file.html",
+        ],
+    )
     async def test_accept_valid_filenames(self, docker_client, valid_filename):
         """Test that valid filenames are accepted (up to the existence check)."""
         # Mock file doesn't exist (so it fails at existence check, not validation)

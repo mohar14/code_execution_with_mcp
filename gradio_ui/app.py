@@ -278,10 +278,7 @@ async def fetch_artifacts(user_id: str) -> list[str]:
     """
     try:
         async with httpx.AsyncClient() as http_client:
-            response = await http_client.get(
-                f"{AGENT_API_URL}/artifacts/{user_id}",
-                timeout=10.0
-            )
+            response = await http_client.get(f"{AGENT_API_URL}/artifacts/{user_id}", timeout=10.0)
             response.raise_for_status()
             data = response.json()
             return data.get("artifacts", [])
@@ -343,13 +340,13 @@ def format_artifacts_section(user_id: str, artifacts: list[str]) -> str:
         download_url = f"{AGENT_API_URL}/artifacts/{user_id}/{artifact}"
         # Determine icon based on file extension
         icon = "📄"
-        if artifact.endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg')):
+        if artifact.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg")):
             icon = "🖼️"
-        elif artifact.endswith(('.pdf',)):
+        elif artifact.endswith((".pdf",)):
             icon = "📕"
-        elif artifact.endswith(('.py', '.js', '.ts', '.java', '.cpp')):
+        elif artifact.endswith((".py", ".js", ".ts", ".java", ".cpp")):
             icon = "💻"
-        elif artifact.endswith(('.csv', '.xlsx', '.json')):
+        elif artifact.endswith((".csv", ".xlsx", ".json")):
             icon = "📊"
 
         artifact_links.append(f"""
@@ -601,7 +598,12 @@ async def chat_with_agent(
                     # Update the last message in history
                     history[-1] = (message, current_response)
 
-                yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
+                yield (
+                    history,
+                    current_response,
+                    *build_activity_logs(),
+                    format_artifacts_section("", []),
+                )
 
             # Handle tool calls
             if delta.tool_calls:
@@ -685,7 +687,12 @@ async def chat_with_agent(
                             except (json.JSONDecodeError, KeyError):
                                 pass
 
-                        yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
+                        yield (
+                            history,
+                            current_response,
+                            *build_activity_logs(),
+                            format_artifacts_section("", []),
+                        )
                     except json.JSONDecodeError:
                         # Arguments not complete yet, wait for more chunks
                         pass
@@ -714,7 +721,12 @@ async def chat_with_agent(
                     artifacts_html = await refresh_artifacts_display(user_id)
                     yield history, current_response, *build_activity_logs(), artifacts_html
                 else:
-                    yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
+                    yield (
+                        history,
+                        current_response,
+                        *build_activity_logs(),
+                        format_artifacts_section("", []),
+                    )
 
     except Exception as e:
         error_msg = f"Error: {e!s}"
@@ -842,13 +854,10 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
                 )
                 with gr.Row():
                     refresh_artifacts_btn = gr.Button(
-                        "🔄 Refresh Artifacts",
-                        size="sm",
-                        variant="secondary"
+                        "🔄 Refresh Artifacts", size="sm", variant="secondary"
                     )
                 artifacts_display = gr.HTML(
-                    value=format_artifacts_section("", []),
-                    label="Artifacts"
+                    value=format_artifacts_section("", []), label="Artifacts"
                 )
 
     # Examples
@@ -892,14 +901,20 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
     new_session_btn.click(
         fn=new_session_and_clear,
-        outputs=[user_id_display, chatbot, msg_input, docker_log, tools_log, status_log, artifacts_display]
+        outputs=[
+            user_id_display,
+            chatbot,
+            msg_input,
+            docker_log,
+            tools_log,
+            status_log,
+            artifacts_display,
+        ],
     )
 
     # Refresh artifacts button
     refresh_artifacts_btn.click(
-        fn=refresh_artifacts_display,
-        inputs=[user_id_display],
-        outputs=[artifacts_display]
+        fn=refresh_artifacts_display, inputs=[user_id_display], outputs=[artifacts_display]
     )
 
     # Load health status on startup
