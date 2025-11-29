@@ -34,7 +34,6 @@ venv.bak/
 
 # UV
 .uv/
-uv.lock
 
 # PyCharm
 .idea/
