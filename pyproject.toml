@@ -10,6 +10,7 @@ dependencies = [
     "fastmcp>=2.13.1",
     "google-adk>=1.18.0",
     "gradio>=5.50.0",
+    "griffe>=1.15.0",
     "httpx>=0.28.1",
     "litellm>=1.65.0",
     "loguru>=0.7.3",

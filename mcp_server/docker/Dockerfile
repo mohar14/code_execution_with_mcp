@@ -17,10 +17,13 @@ RUN mkdir -p /tools /skills && \
     chown root:root /tools /skills && \
     chmod 755 /tools /skills
 
-# Create a workspace directory for user files
+# Create a workspace and artifacts directory for user files
 RUN mkdir -p /workspace && \
     chown coderunner:coderunner /workspace && \
-    chmod 755 /workspace
+    chmod 755 /workspace && \
+    mkdir -p /artifacts && \
+    chown coderunner:coderunner /artifacts && \
+    chmod 755 /artifacts
 
 # Install common data analysis and statistics libraries
 RUN pip install --no-cache-dir \

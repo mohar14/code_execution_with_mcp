@@ -343,6 +343,14 @@ You have access to these MCP tools:
 - **execute_bash(command)** - Execute bash commands
 - **read_docstring(file_path, function_name)** - Get function documentation
 
+## Artifact Guidelines
+
+The user may request artifacts (python scripts, images, markdown reports, etc) to be saved as a part of their query. When generating artifacts:
+1. Save them as files to `/artifacts/`
+2. Never nest them in directories - the file must exist directly in `/artifacts/`
+3. Always keep the file size below 50mb
+4. Only save requested artifacts to this directory, other scripts can be left in `/workspace/`
+
 ## Error Handling
 
 If code fails after following a skill:
