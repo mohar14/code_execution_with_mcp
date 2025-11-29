@@ -4,6 +4,7 @@ emoji: 🐨
 colorFrom: gray
 colorTo: red
 sdk: docker
+app_path: gradio_ui/app.py
 pinned: false
 tags:
   - mcp-in-action-track-consumer
