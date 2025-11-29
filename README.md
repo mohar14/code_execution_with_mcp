@@ -3,9 +3,7 @@ title: Code Execution With Mcp
 emoji: 🐨
 colorFrom: gray
 colorTo: red
-sdk: gradio
-sdk_version: 6.0.0
-app_file: app.py
+sdk: docker
 pinned: false
 tags:
   - mcp-in-action-track-consumer
