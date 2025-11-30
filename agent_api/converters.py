@@ -161,7 +161,12 @@ async def convert_adk_events_to_openai(
                     previous_event_has_tool_calls = True
 
             # Extract text content from event (excluding function calls/responses)
-            if hasattr(event, "content") and event.content and hasattr(event.content, "parts") and event.partial is True:
+            if (
+                hasattr(event, "content")
+                and event.content
+                and hasattr(event.content, "parts")
+                and event.partial is True
+            ):
                 # Parse parts to extract just the text
                 for part in event.content.parts:
                     # Only send text parts, skip function calls/responses

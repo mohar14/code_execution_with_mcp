@@ -205,7 +205,7 @@ async def chat_completions(request: ChatCompletionRequest):
                 user_id=user_id,
                 session_id=session_id,
                 new_message=message_content,
-                run_config=RunConfig(streaming_mode=StreamingMode.SSE)
+                run_config=RunConfig(streaming_mode=StreamingMode.SSE),
             )
 
             # Convert to OpenAI format
