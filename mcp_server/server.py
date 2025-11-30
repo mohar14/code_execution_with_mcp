@@ -91,7 +91,7 @@ async def execute_bash(
     command: Annotated[str, "Bash command to execute in the container"],
     timeout: Annotated[int, "Command timeout in seconds (default: 30)"] = 30,
     ctx: Context = None,
-) -> dict[str, str | int]:
+) -> dict[str, int | str]:
     """Execute a bash command in the user's isolated Docker container.
 
     This tool runs arbitrary bash commands in a secure, per-user container.
@@ -103,7 +103,7 @@ async def execute_bash(
         ctx: MCP request context (automatically injected)
 
     Returns:
-        Dictionary containing:
+        Dictionary object containing:
         - exit_code: Command exit code (0 for success)
         - stdout: Standard output from the command
         - stderr: Standard error from the command

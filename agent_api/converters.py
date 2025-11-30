@@ -190,8 +190,8 @@ async def convert_adk_events_to_openai(
             # so we handle them as content
 
     except Exception as e:
-        logger.error(f"Error converting events: {e}", exc_info=True)
-        yield convert_error_event(request_id, model, str(e))
+        logger.error(f"Error converting events: {e}")
+        raise
 
     # Send final completion chunk
     logger.debug(f"Sending completion chunk for request {request_id}")

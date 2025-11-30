@@ -1,6 +1,7 @@
 """FastAPI server for OpenAI-compatible Agent API."""
 
 import base64
+import json
 import os
 import tempfile
 import time
@@ -9,7 +10,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import httpx
-import litellm
 from agent_manager import AgentManager
 from config import settings
 from converters import convert_adk_events_to_openai, format_sse, format_sse_done
@@ -25,9 +25,6 @@ from models import (
     ModelList,
 )
 from session_store import SessionStore
-
-# Set litellm debug mode on
-litellm._turn_on_debug()
 
 # Global instances
 agent_manager: AgentManager | None = None
@@ -100,7 +97,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     Returns:
         JSON response with error details
     """
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"error": {"message": "Internal server error"}},
@@ -224,10 +221,14 @@ async def chat_completions(request: ChatCompletionRequest):
             logger.info(f"Chat completion finished for user {user_id}")
 
         except Exception as e:
-            logger.error(f"Error in chat completion: {e}", exc_info=True)
+            import traceback
+
+            logger.error(f"Error in chat completion: {traceback.format_exc()}")
             # Send error as SSE
-            error_data = {"error": {"message": str(e), "type": "internal_error"}}
+            error_data = json.dumps({"error": {"message": str(e), "type": "internal_error"}})
+            logger.error(f"Sending error response: {error_data}")
             yield f"data: {error_data}\n\n"
+            yield format_sse_done()
 
     return StreamingResponse(
         event_generator(),

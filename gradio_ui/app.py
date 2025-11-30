@@ -730,11 +730,16 @@ async def chat_with_agent(
 
     except Exception as e:
         error_msg = f"Error: {e!s}"
-        logger.error(f"Chat error: {e}", exc_info=True)
+        logger.error(f"Chat error: {e}")
         status_updates.append(
             f"<div style='margin: 1rem 0; padding: 0.5rem; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;'>❌ <strong>Error:</strong> {error_msg}</div>"
         )
+        current_response += (
+            "\n\nSomething went wrong during agent execution. Please try again later."
+        )
+        history[-1] = (message, current_response)
         yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
+        return
 
 
 async def refresh_health() -> str:
