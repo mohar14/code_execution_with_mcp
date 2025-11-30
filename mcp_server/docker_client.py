@@ -371,26 +371,27 @@ class DockerExecutionClient:
             except docker.errors.NotFound:
                 pass
 
-    def cleanup_container(self, user_id: str) -> None:
+    def cleanup_container(self, user_id: str, force: bool) -> None:
         """Remove a user's container completely.
 
         Args:
             user_id: Unique identifier for the user
+            force: Boolean flag to force container removal
         """
         if user_id in self.user_containers:
             try:
                 container = self.user_containers[user_id]
-                container.stop(timeout=120)
-                container.remove()
+                container.stop(timeout=30)
+                container.remove(force=force)
             except docker.errors.NotFound:
                 pass
             finally:
                 del self.user_containers[user_id]
 
-    def cleanup_all(self) -> None:
+    def cleanup_all(self, force: bool = True) -> None:
         """Stop and remove all managed containers."""
         for user_id in list(self.user_containers.keys()):
-            self.cleanup_container(user_id)
+            self.cleanup_container(user_id, force)
 
     def __del__(self):
         """Cleanup on deletion."""

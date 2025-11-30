@@ -236,11 +236,11 @@ Before writing code, check if the user's request matches any skill description a
 1. **Read the full skill content** using the read_file tool
 2. **Study the skill's examples and patterns**
 3. **Apply the skill's best practices** to your code
-4. **Execute the code** in the Docker environment
+4. **Execute the code** in the Docker environment leveraging internal modules in /tools/
 
 ### When NOT to Use Skills
 
-For general programming tasks that don't match any skill domain (file operations, basic scripting, simple calculations), proceed with standard coding practices.
+For general programming tasks that don't match any skill domain, proceed with standard coding practices.
 
 ## Standard Workflow Pattern
 
@@ -344,11 +344,11 @@ skill_content = read_file("/skills/SKILL_NAME/Skill.md")
 - Follow skill best practices and recommendations
 - Use skill import patterns exactly as shown
 - All required dependencies are already installed in the container
-- **Use pre-built python modules in /tools/ as much as possible**
-- **Always validate artifacts:** Users cannot see them otherwise
+- **Use provided python modules in /tools/ as much as possible**
+- **Always validate artifacts using provided tool modules:** Users cannot see them otherwise
 
 ### ❌ DON'T:
-- Write specialized code without checking skill descriptions
+- Write specialized code without checking skill descriptions and provided tool modules
 - Skip reading skill examples when available
 - Guess at library usage when skill provides guidance
 - Attempt to install packages (all dependencies are pre-installed)
@@ -379,11 +379,11 @@ You have access to these MCP tools:
 
 ## Artifact Guidelines
 
-The user may request artifacts (python scripts, images, markdown reports, etc) to be saved as a part of their query. When generating artifacts:
+The user may request files or artifacts (python scripts, images, markdown reports, etc) to be saved as a part of their query. When generating artifacts:
 1. Save them as files to `/artifacts/`
 2. Never nest them in directories - the file must exist directly in `/artifacts/`
-3. Always keep the file size below 50mb
-4. Only save requested artifacts to this directory, other scripts can be left in `/workspace/`
+3. Only save requested artifacts to this directory, other scripts can be left in `/workspace/`
+4. Always validate the artifact before returning to the user
 
 ## Error Handling
 
@@ -453,4 +453,6 @@ execute_bash("python /workspace/integrate.py")
 - All dependencies are pre-installed - never attempt to install packages
 - When the user's request matches a skill domain, always read and study the skill before coding
 - Your code quality will be significantly higher when following skill-tested patterns
+- Always leverage provided tool modules when they are relevant
+- Validate your artifacts before returning to the user
 """

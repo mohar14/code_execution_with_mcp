@@ -207,7 +207,13 @@ def format_sse(chunk: ChatCompletionChunk) -> str:
     Returns:
         SSE-formatted string
     """
-    return f"data: {chunk.model_dump_json()}\n\n"
+    try:
+        logger.debug(f"Serializing chunk: {chunk}")
+        chunk_data = chunk.model_dump_json()
+    except Exception as e:
+        logger.error(f"Failed to serialize chunk: {e}")
+        raise e
+    return f"data: {chunk_data}\n\n"
 
 
 def format_sse_done() -> str:

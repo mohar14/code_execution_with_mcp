@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import httpx
+import litellm
 from agent_manager import AgentManager
 from config import settings
 from converters import convert_adk_events_to_openai, format_sse, format_sse_done
@@ -24,6 +25,9 @@ from models import (
     ModelList,
 )
 from session_store import SessionStore
+
+# Set litellm debug mode on
+litellm._turn_on_debug()
 
 # Global instances
 agent_manager: AgentManager | None = None
@@ -290,7 +294,7 @@ async def list_artifacts(user_id: str):
 
     except httpx.HTTPError as e:
         logger.error(f"Failed to list artifacts for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list artifacts: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to list artifacts: {e!s}") from e
 
 
 @app.get("/artifacts/{user_id}/{artifact_id}")
@@ -345,12 +349,12 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
             os.unlink(temp_path)
 
         if e.response.status_code == 404:
-            raise HTTPException(status_code=404, detail=f"Artifact not found: {artifact_id}")
+            raise HTTPException(status_code=404, detail=f"Artifact not found: {artifact_id}") from e
         elif e.response.status_code == 400:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         else:
             logger.error(f"Failed to download artifact {artifact_id} for user {user_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to download artifact")
+            raise HTTPException(status_code=500, detail="Failed to download artifact") from e
 
     except Exception as e:
         # Clean up temp file if error occurs
@@ -358,7 +362,7 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
             os.unlink(temp_path)
 
         logger.error(f"Error downloading artifact {artifact_id} for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to download artifact: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to download artifact: {e!s}") from e
 
 
 if __name__ == "__main__":

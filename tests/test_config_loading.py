@@ -19,11 +19,11 @@ def load_dotenv():
         for line in f:
             line = line.strip()
             # Skip comments and empty lines
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
             # Parse KEY=VALUE
-            if '=' in line:
-                key, value = line.split('=', 1)
+            if "=" in line:
+                key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip()
                 # Set in environment
@@ -78,6 +78,7 @@ def test_config_loading():
 
     try:
         from agent_api.config import settings
+
         print("  ✓ Settings imported successfully")
     except Exception as e:
         print(f"  ✗ Failed to import settings: {e}")
