@@ -49,5 +49,7 @@ WORKDIR /workspace
 # Switch to non-root user
 USER coderunner
 
+ENV PYTHONPATH="/tools:$PYTHONPATH"
+
 # Default command
 CMD ["/bin/bash"]

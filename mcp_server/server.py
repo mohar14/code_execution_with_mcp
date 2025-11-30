@@ -15,8 +15,10 @@ from starlette.responses import JSONResponse
 from utils import (
     generate_agent_prompt,
     generate_skills_section,
+    generate_tools_section,
     get_skill,
     list_available_skills,
+    list_available_tools,
 )
 
 # Global client instance (initialized in lifespan)
@@ -112,7 +114,7 @@ async def execute_bash(
         {'exit_code': 0, 'stdout': 'Python 3.12.0\\n', 'stderr': ''}
     """
     user_id = get_user_id(ctx)
-    logger.info(f"Executing bash command for user {user_id}: {command[:100]}...")
+    logger.info(f"Executing bash command for user {user_id}: {command}")
 
     try:
         exit_code, stdout, stderr = await docker_client.execute_bash(
@@ -211,6 +213,7 @@ async def write_file(
     """
     user_id = get_user_id(ctx)
     logger.info(f"Writing file for user {user_id}: {file_path}")
+    logger.debug(f"{user_id}:{file_path} Content: {content}")
 
     try:
         await docker_client.write_file(
@@ -275,18 +278,19 @@ async def read_docstring(
 
 @mcp.prompt()
 def agent_system_prompt() -> str:
-    """Generate a system prompt for agents with embedded skill descriptions.
+    """Generate a system prompt for agents with embedded skill and tool descriptions.
 
     This prompt provides agents with:
     - Overview of the skills system
     - Dynamically embedded skill descriptions from /skills/ folder
+    - Dynamically embedded tool descriptions from /tools/ folder
     - Workflow patterns for using skills with read_file tool
     - Complete usage examples (no API calls, no package installation)
 
     Returns:
-        Complete system prompt with all available skills embedded
+        Complete system prompt with all available skills and tools embedded
     """
-    logger.info("Generating agent system prompt with embedded skills")
+    logger.info("Generating agent system prompt with embedded skills and tools")
 
     try:
         # Get all available skills
@@ -295,10 +299,16 @@ def agent_system_prompt() -> str:
         # Generate skills section
         skills_section = generate_skills_section(skills)
 
-        # Generate complete prompt
-        prompt = generate_agent_prompt(skills_section)
+        # Get all available tools
+        tools = list_available_tools()
 
-        logger.info(f"Generated agent prompt with {len(skills)} skills")
+        # Generate tools section
+        tools_section = generate_tools_section(tools)
+
+        # Generate complete prompt
+        prompt = generate_agent_prompt(skills_section, tools_section)
+
+        logger.info(f"Generated agent prompt with {len(skills)} skills and {len(tools)} tools")
         return prompt
 
     except Exception as e:

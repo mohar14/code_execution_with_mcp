@@ -18,6 +18,7 @@ dependencies = [
     "numpy>=2.3.5",
     "openai>=2.8.1",
     "pydantic>=2.12.3",
+    "sympy>=1.14.0",
 ]
 
 [dependency-groups]

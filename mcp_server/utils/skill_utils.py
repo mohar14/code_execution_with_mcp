@@ -176,15 +176,47 @@ def generate_skills_section(skills: list[dict]) -> str:
     return "\n".join(sections)
 
 
-def generate_agent_prompt(skills_section: str) -> str:
-    """Generate the complete agent system prompt with embedded skills.
+def generate_agent_prompt(skills_section: str, tools_section: str = "") -> str:
+    """Generate the complete agent system prompt with embedded skills and tools.
 
     Args:
         skills_section: Formatted skills section to embed
+        tools_section: Formatted tools section to embed (optional)
 
     Returns:
         Complete system prompt markdown
     """
+    # Generate tools content if tools are available
+    tools_content = ""
+    if tools_section:
+        tools_content = f"""
+## Available Helper Tools
+
+The following Python tool modules are available in your container at `/tools/`:
+
+{tools_section}
+
+### Using Helper Tools
+
+Helper tools provide utility functions that complement skills. To discover function details:
+
+1. **View function documentation** using the read_docstring tool:
+```python
+# Get detailed documentation for a specific function
+doc = read_docstring("/tools/sympy_helpers.py", "parse_expression")
+```
+
+2. **Import and use in your code**:
+```python
+# Tools are available at /tools/ in the container, this is already on the PYTHONPATH
+from sympy_helpers import parse_expression, to_latex
+
+expr = parse_expression("x**2 + 2*x + 1")
+print(to_latex(expr, mode="display"))
+```
+
+"""
+
     return f"""# Agentic Code Execution with Domain Skills
 
 You are an AI agent with access to a Docker-based code execution environment and specialized domain skills. Skills provide expert guidance, best practices, and reference implementations for specialized tasks.
@@ -194,7 +226,7 @@ You are an AI agent with access to a Docker-based code execution environment and
 The following skills are available in your container at `/skills/`:
 
 {skills_section}
-
+{tools_content}
 ## Core Workflow
 
 ### When to Use Skills
@@ -312,6 +344,8 @@ skill_content = read_file("/skills/SKILL_NAME/Skill.md")
 - Follow skill best practices and recommendations
 - Use skill import patterns exactly as shown
 - All required dependencies are already installed in the container
+- **Use pre-built python modules in /tools/ as much as possible**
+- **Always validate artifacts:** Users cannot see them otherwise
 
 ### ❌ DON'T:
 - Write specialized code without checking skill descriptions

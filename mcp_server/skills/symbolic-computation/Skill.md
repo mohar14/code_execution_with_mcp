@@ -237,3 +237,30 @@ print(f"Check: {A * x}")  # Should equal b
 ## Communication Guidelines
 
 **Critical:** Always present any equations in your responses using a markdown-compatible LaTex syntax
+
+## Related Helper Tools
+
+This skill is complemented by the **sympy_helpers** tool module located at `/tools/sympy_helpers.py`. These utilities provide:
+
+- **Expression parsing**: Convert strings and LaTeX to SymPy expressions
+- **Format conversion**: Output expressions as LaTeX for display
+- **Serialization**: Convert expressions to JSON-compatible dictionaries
+
+### Using Helper Tools with This Skill
+
+```python
+# Import helpers
+from sympy_helpers import parse_expression, to_latex, expression_to_dict
+
+# Parse user input
+expr = parse_expression("x**2 + 2*x + 1")
+
+# Work with the expression using skill patterns
+from sympy import diff, symbols
+x = symbols('x')
+derivative = diff(expr, x)
+
+# Format output for display
+print(to_latex(derivative, mode="display"))
+# Output: $$2 x + 2$$
+```
