@@ -79,7 +79,7 @@ This project implements this pattern using MCP (Model Context Protocol), achievi
 
 ## Demo Video
 
-<video width="50%"><source src="https://github.com/mohar14/code_execution_with_mcp/raw/refs/heads/main/assets/MCP-Birthday-Bash-Demo.mp4" type="video/mp4"></video>
+<video width="50%" controls><source src="https://github.com/mohar14/code_execution_with_mcp/raw/refs/heads/main/assets/MCP-Birthday-Bash-Demo.mp4" type="video/mp4"></video>
 
 ---
 
