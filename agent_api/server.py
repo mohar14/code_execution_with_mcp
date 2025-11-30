@@ -14,6 +14,7 @@ from config import settings
 from converters import convert_adk_events_to_openai, format_sse, format_sse_done
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 from loguru import logger
 from models import (
@@ -204,6 +205,7 @@ async def chat_completions(request: ChatCompletionRequest):
                 user_id=user_id,
                 session_id=session_id,
                 new_message=message_content,
+                run_config=RunConfig(streaming_mode=StreamingMode.SSE)
             )
 
             # Convert to OpenAI format
