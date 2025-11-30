@@ -824,7 +824,15 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
     with gr.Row():
         with gr.Column(scale=2):
-            chatbot = gr.Chatbot(label="Conversation", height=500, show_copy_button=True)
+            chatbot = gr.Chatbot(
+                label="Conversation",
+                height=500,
+                show_copy_button=True,
+                latex_delimiters=[
+                    {"left": "$$", "right": "$$", "display": True},
+                    {"left": "$", "right": "$", "display": False},
+                ],
+            )
 
             with gr.Row():
                 msg_input = gr.Textbox(
