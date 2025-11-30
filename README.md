@@ -101,15 +101,15 @@ cd mcp_server/docker && ./build.sh && cd ../..
 
 # Terminal 1 - MCP Server
 cd mcp_server
-uv run server.py
+uv run --env-file path/to/dotenv server.py
 
 # Terminal 2 - Agent API
 cd agent_api
-uv run server.py
+uv run --env-file path/to/dotenv server.py
 
 # Terminal 3 - Gradio UI
 cd gradio_ui
-uv run app.py
+uv run --env-file path/to/dotenv app.py
 ```
 
 Open http://localhost:7860
