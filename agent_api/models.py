@@ -66,12 +66,6 @@ class ModelList(BaseModel):
     data: list[ModelInfo]
 
 
-class ErrorResponse(BaseModel):
-    """Error response model."""
-
-    error: dict[str, str]
-
-
 class HealthResponse(BaseModel):
     """Health check response model."""
 

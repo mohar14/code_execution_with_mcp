@@ -87,25 +87,6 @@ def convert_completion_event(request_id: str, model: str) -> ChatCompletionChunk
     )
 
 
-def convert_error_event(request_id: str, model: str, error: str) -> ChatCompletionChunk:
-    """Generate error chunk.
-
-    Args:
-        request_id: Unique request identifier
-        model: Model name
-        error: Error message
-
-    Returns:
-        OpenAI-compatible ChatCompletionChunk with error
-    """
-    delta = DeltaContent(content=f"Error: {error}")
-    choice = Choice(index=0, delta=delta, finish_reason="error")
-
-    return ChatCompletionChunk(
-        id=request_id, created=int(time.time()), model=model, choices=[choice]
-    )
-
-
 async def convert_adk_events_to_openai(
     events: AsyncGenerator[Event, None], model: str
 ) -> AsyncGenerator[ChatCompletionChunk, None]:
