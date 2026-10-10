@@ -1,0 +1,2 @@
+#!/bin/sh
+exec uv run --frozen pytest tests/test_no_prose_comments.py -q

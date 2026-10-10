@@ -125,6 +125,8 @@ Open http://localhost:7860
 - `openai/gpt-4o`
 - [100+ other providers](https://docs.litellm.ai/docs/providers)
 
+**Comment hygiene hook:** `git config core.hooksPath .githooks` enables a pre-commit check (`tests/test_no_prose_comments.py`) that keeps comments and docstrings to two lines with no history.
+
 ---
 
 ## Context Token Optimization
