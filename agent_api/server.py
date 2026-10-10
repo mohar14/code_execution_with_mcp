@@ -1,5 +1,3 @@
-"""FastAPI server for OpenAI-compatible Agent API."""
-
 import base64
 import json
 import os
@@ -26,26 +24,18 @@ from models import (
 )
 from session_store import SessionStore
 
-# Global instances
 agent_manager: AgentManager | None = None
 session_store: SessionStore | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events for the application.
-
-    Args:
-        app: FastAPI application instance
-    """
-    # Startup
     global agent_manager, session_store
 
     logger.info("Starting Agent API server...")
     logger.info(f"MCP Server URL: {settings.mcp_server_url}")
     logger.info(f"Default Model: {settings.default_model}")
 
-    # Initialize managers
     agent_manager = AgentManager(mcp_server_url=settings.mcp_server_url)
     session_store = SessionStore()
 
@@ -53,7 +43,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
     logger.info("Shutting down Agent API server...")
     logger.info(
         f"Active sessions: {session_store.get_active_session_count() if session_store else 0}"
@@ -63,7 +52,6 @@ async def lifespan(app: FastAPI):
     )
 
 
-# Create FastAPI app
 app = FastAPI(
     title="Code Execution Agent API",
     description="OpenAI-compatible API for code execution agents with Google ADK and MCP",
@@ -74,29 +62,11 @@ app = FastAPI(
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions.
-
-    Args:
-        request: The incoming request
-        exc: The HTTP exception
-
-    Returns:
-        JSON response with error details
-    """
     return JSONResponse(status_code=exc.status_code, content={"error": {"message": exc.detail}})
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Handle general exceptions.
-
-    Args:
-        request: The incoming request
-        exc: The exception
-
-    Returns:
-        JSON response with error details
-    """
     logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -106,12 +76,6 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint.
-
-    Returns:
-        Health status including MCP server connectivity
-    """
-    # Check MCP server connectivity
     mcp_healthy = False
     try:
         async with httpx.AsyncClient() as client:
@@ -130,11 +94,6 @@ async def health_check():
 
 @app.get("/v1/models", response_model=ModelList)
 async def list_models():
-    """List available models.
-
-    Returns:
-        List of available models in OpenAI format
-    """
     return ModelList(
         data=[
             ModelInfo(
@@ -148,37 +107,21 @@ async def list_models():
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
-    """OpenAI-compatible chat completions endpoint (streaming only).
-
-    Args:
-        request: Chat completion request
-
-    Returns:
-        Streaming response with Server-Sent Events
-
-    Raises:
-        HTTPException: If streaming is not enabled or other errors occur
-    """
-    # Validate streaming is enabled - this should be handled at the pydantic layer
     if not request.stream:
         raise HTTPException(
             status_code=400,
             detail="Only streaming responses are supported. Set stream=true",
         )
 
-    # Get or generate user ID
     user_id = request.user or f"user-{uuid.uuid4().hex[:8]}"
     logger.info(f"Chat completion request from user {user_id}")
 
-    # Get or create session
     if session_store is None:
         raise HTTPException(status_code=500, detail="Session store not initialized")
 
-    # Use "agents" app_name to match the agent module path
     session_id = await session_store.get_or_create_session(user_id, app_name="agents")
     logger.debug(f"Using session {session_id} for user {user_id}")
 
-    # Get runner for user
     if agent_manager is None:
         raise HTTPException(status_code=500, detail="Agent manager not initialized")
 
@@ -186,21 +129,16 @@ async def chat_completions(request: ChatCompletionRequest):
         user_id=user_id, session_service=session_store.session_service
     )
 
-    # Extract user message (last message in conversation)
     if not request.messages:
         raise HTTPException(status_code=400, detail="No messages provided")
 
     user_message = request.messages[-1].content
     logger.debug(f"User message: {user_message[:100]}...")
 
-    # Convert string message to google.genai.types.Content
     message_content = types.Content(role="user", parts=[types.Part(text=user_message)])
 
-    # Stream events
     async def event_generator():
-        """Generate Server-Sent Events from ADK agent stream."""
         try:
-            # Get ADK event stream
             logger.debug("Starting ADK agent stream")
             adk_events = runner.run_async(
                 user_id=user_id,
@@ -209,14 +147,11 @@ async def chat_completions(request: ChatCompletionRequest):
                 run_config=RunConfig(streaming_mode=StreamingMode.SSE),
             )
 
-            # Convert to OpenAI format
             openai_chunks = convert_adk_events_to_openai(events=adk_events, model=request.model)
 
-            # Stream as SSE
             async for chunk in openai_chunks:
                 yield format_sse(chunk)
 
-            # Send done marker
             yield format_sse_done()
             logger.info(f"Chat completion finished for user {user_id}")
 
@@ -224,7 +159,6 @@ async def chat_completions(request: ChatCompletionRequest):
             import traceback
 
             logger.error(f"Error in chat completion: {traceback.format_exc()}")
-            # Send error as SSE
             error_data = json.dumps({"error": {"message": str(e), "type": "internal_error"}})
             logger.error(f"Sending error response: {error_data}")
             yield f"data: {error_data}\n\n"
@@ -236,18 +170,13 @@ async def chat_completions(request: ChatCompletionRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "X-Accel-Buffering": "no",
         },
     )
 
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information.
-
-    Returns:
-        API information and available endpoints
-    """
     return {
         "name": "Code Execution Agent API",
         "version": "0.1.0",
@@ -264,32 +193,13 @@ async def root():
 
 @app.get("/artifacts/{user_id}")
 async def list_artifacts(user_id: str):
-    """List all artifacts for a specific user.
-
-    Args:
-        user_id: User identifier
-
-    Returns:
-        JSON response with list of artifact paths
-
-    Example Response:
-        {
-            "artifacts": ["report.pdf", "analysis.py", "chart.png"],
-            "count": 3
-        }
-
-    Raises:
-        HTTPException: If MCP server request fails
-    """
     try:
-        # Get MCP server base URL from health endpoint config
         mcp_base = settings.mcp_server_health_endpoint.replace("/health", "")
 
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{mcp_base}/{user_id}/artifacts", timeout=10.0)
             response.raise_for_status()
 
-            # Return the artifacts list from MCP response
             data = response.json()
             return {"artifacts": data.get("artifacts", []), "count": data.get("count", 0)}
 
@@ -300,22 +210,8 @@ async def list_artifacts(user_id: str):
 
 @app.get("/artifacts/{user_id}/{artifact_id}")
 async def download_artifact(user_id: str, artifact_id: str, background_tasks: BackgroundTasks):
-    """Download a specific artifact file.
-
-    Args:
-        user_id: User identifier
-        artifact_id: Artifact filename
-        background_tasks: FastAPI background tasks for cleanup
-
-    Returns:
-        FileResponse with decoded artifact data
-
-    Raises:
-        HTTPException: If artifact not found or retrieval fails
-    """
     temp_path = None
     try:
-        # Get MCP server base URL from health endpoint config
         mcp_base = settings.mcp_server_health_endpoint.replace("/health", "")
 
         async with httpx.AsyncClient() as client:
@@ -324,28 +220,22 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
             )
             response.raise_for_status()
 
-            # Extract base64 data from MCP response
             data = response.json()
             base64_data = data.get("data", "")
 
-            # Decode base64 to bytes
             decoded_bytes = base64.b64decode(base64_data)
 
-            # Write to temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{artifact_id}") as temp_file:
                 temp_file.write(decoded_bytes)
                 temp_path = temp_file.name
 
-            # Schedule cleanup after response is sent
             background_tasks.add_task(os.unlink, temp_path)
 
-            # Return as downloadable file
             return FileResponse(
                 path=temp_path, filename=artifact_id, media_type="application/octet-stream"
             )
 
     except httpx.HTTPStatusError as e:
-        # Clean up temp file if error occurs
         if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
 
@@ -358,7 +248,6 @@ async def download_artifact(user_id: str, artifact_id: str, background_tasks: Ba
             raise HTTPException(status_code=500, detail="Failed to download artifact") from e
 
     except Exception as e:
-        # Clean up temp file if error occurs
         if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
 
@@ -374,5 +263,5 @@ if __name__ == "__main__":
         host=settings.agent_api_host,
         port=settings.agent_api_port,
         log_level="info",
-        reload=os.getenv("DEV_RELOAD", "false").lower() == "true",  # Development hot reload flag
+        reload=os.getenv("DEV_RELOAD", "false").lower() == "true",
     )
