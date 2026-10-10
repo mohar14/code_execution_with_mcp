@@ -253,4 +253,4 @@ flowchart TB
     style Resources fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5
 ```
 
-Generate diagram image: `python generate_diagram.py`
+Generate diagram image: `uv run python generate_diagram.py`
