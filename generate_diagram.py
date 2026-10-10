@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Generate architecture diagram image from Mermaid code."""
 
 import subprocess
 import sys
 from pathlib import Path
 
-# Mermaid diagram code
 MERMAID_CODE = """flowchart TB
     subgraph Frontend["🎨 Frontend Layer"]
         UI["💬 Gradio UI<br/>━━━━━━━━━━━<br/>👤 User Authentication<br/>📡 Real-time Streaming<br/>📊 Artifact Viewer"]
@@ -78,7 +76,6 @@ MERMAID_CODE = """flowchart TB
 
 
 def check_mmdc_installed():
-    """Check if mermaid-cli (mmdc) is installed."""
     try:
         subprocess.run(["mmdc", "--version"], capture_output=True, check=True)
         return True
@@ -87,7 +84,6 @@ def check_mmdc_installed():
 
 
 def install_instructions():
-    """Print installation instructions for mermaid-cli."""
     print("\n" + "=" * 80)
     print("ERROR: mermaid-cli (mmdc) is not installed")
     print("=" * 80)
@@ -101,24 +97,19 @@ def install_instructions():
 
 
 def generate_diagram():
-    """Generate diagram image from mermaid code."""
-    # Create docs directory if it doesn't exist
     docs_dir = Path("docs")
     docs_dir.mkdir(exist_ok=True)
 
-    # Write mermaid code to temp file
     mermaid_file = docs_dir / "architecture.mmd"
     with open(mermaid_file, "w") as f:
         f.write(MERMAID_CODE)
 
     print(f"✓ Mermaid code written to {mermaid_file}")
 
-    # Check if mmdc is installed
     if not check_mmdc_installed():
         install_instructions()
         return False
 
-    # Generate PNG
     output_png = docs_dir / "architecture.png"
     print("\nGenerating PNG diagram...")
     try:
@@ -141,7 +132,6 @@ def generate_diagram():
         print(f"✗ Failed to generate PNG: {e}")
         return False
 
-    # Generate SVG
     output_svg = docs_dir / "architecture.svg"
     print("\nGenerating SVG diagram...")
     try:
