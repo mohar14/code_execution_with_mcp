@@ -4,6 +4,10 @@ Description: Validation utility for artifacts saved to /artifacts/, with syntax 
 Version: 2.0.0
 Dependencies: None
 
+This module provides a single validation function to ensure artifacts meet
+requirements: allowed extension, valid path, size limit, no nesting, and
+syntax validation for structured file types (JSON, Python, CSV).
+
 Available Functions:
 - validate_artifact: Returns JSON string with validation details for artifacts, including checks for: existence, size, path, and syntax
 """
@@ -39,6 +43,10 @@ def validate_artifact(artifact_path: str) -> dict:
         - errors: list of error messages (empty if valid)
         - file_size_bytes: file size in bytes (0 if file doesn't exist)
         - extension: file extension (lowercase)
+
+    Example:
+        >>> result = validate_artifact("/artifacts/data.csv")
+        >>> print(result)
     """
     result = {
         "valid": False,

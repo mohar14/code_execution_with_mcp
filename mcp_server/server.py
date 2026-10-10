@@ -64,9 +64,26 @@ async def execute_bash(
     timeout: Annotated[int, "Command timeout in seconds (default: 30)"] = 30,
     ctx: Context = None,
 ) -> dict[str, int | str]:
-    """Execute a bash command in the user's persistent per-user Docker container.
+    """Execute a bash command in the user's isolated Docker container.
 
-    Returns {exit_code, stdout, stderr}; exit_code 0 means success.
+    This tool runs arbitrary bash commands in a secure, per-user container.
+    The container persists between calls for the same user.
+
+    Args:
+        command: The bash command to execute
+        timeout: Maximum execution time in seconds
+        ctx: MCP request context (automatically injected)
+
+    Returns:
+        Dictionary object containing:
+        - exit_code: Command exit code (0 for success)
+        - stdout: Standard output from the command
+        - stderr: Standard error from the command
+
+    Example:
+        >>> result = await execute_bash("python --version")
+        >>> print(result)
+        {'exit_code': 0, 'stdout': 'Python 3.12.0\\n', 'stderr': ''}
     """
     user_id = get_user_id(ctx)
     logger.info(f"Executing bash command for user {user_id}: {command}")
@@ -102,7 +119,28 @@ async def read_file(
     line_count: Annotated[int | None, "Number of lines to read (None for all)"] = None,
     ctx: Context = None,
 ) -> str:
-    """Read a file from the user's container, optionally paginated by line."""
+    """Read a file from the user's container with optional line-based pagination.
+
+    Reads files from the user's persistent container filesystem. Useful for
+    retrieving execution results, logs, or generated files.
+
+    Args:
+        file_path: Absolute path to the file (e.g., "/workspace/output.txt")
+        offset: Line number to start reading from (default: 0)
+        line_count: Maximum number of lines to read (default: all)
+        ctx: MCP request context (automatically injected)
+
+    Returns:
+        File contents as a string
+
+    Example:
+        >>> content = await read_file("/workspace/data.txt")
+        >>> print(content)
+        'Line 1\\nLine 2\\nLine 3'
+
+        >>> # Read lines 10-20
+        >>> content = await read_file("/workspace/log.txt", offset=10, line_count=10)
+    """
     user_id = get_user_id(ctx)
     logger.info(f"Reading file for user {user_id}: {file_path}")
 
@@ -128,7 +166,23 @@ async def write_file(
     content: Annotated[str, "Content to write to the file"],
     ctx: Context = None,
 ) -> str:
-    """Create or overwrite a file in the user's container."""
+    """Write content to a file in the user's container.
+
+    Creates or overwrites a file in the user's container filesystem.
+    Handles special characters and multi-line content safely.
+
+    Args:
+        file_path: Absolute path for the file (e.g., "/workspace/script.py")
+        content: Text content to write
+        ctx: MCP request context (automatically injected)
+
+    Returns:
+        Success message
+
+    Example:
+        >>> await write_file("/workspace/hello.py", "print('Hello, World!')")
+        'Successfully wrote 22 bytes to /workspace/hello.py'
+    """
     user_id = get_user_id(ctx)
     logger.info(f"Writing file for user {user_id}: {file_path}")
     logger.debug(f"{user_id}:{file_path} Content: {content}")
@@ -154,9 +208,23 @@ async def read_docstring(
     function_name: Annotated[str, "Name of the function to inspect"],
     ctx: Context = None,
 ) -> str:
-    """Read the docstring of a function from a Python file in the container.
+    """Read the docstring of a function from a Python file.
 
-    Returns an empty string if not found.
+    Retrieves documentation for functions defined in Python files in the
+    container filesystem. Uses Python's help() to get formatted documentation.
+
+    Args:
+        file_path: Absolute path to the Python file (e.g., "/workspace/utils.py")
+        function_name: Name of the function to get documentation for
+        ctx: MCP request context (automatically injected)
+
+    Returns:
+        The function's docstring, or empty string if not found
+
+    Example:
+        >>> doc = await read_docstring("/workspace/utils.py", "greet")
+        >>> print(doc)
+        'Generate a greeting message.\\n\\nArgs:\\n    name: The name to greet...'
     """
     user_id = get_user_id(ctx)
     logger.info(f"Reading docstring for user {user_id}: {file_path}:{function_name}")
@@ -182,7 +250,18 @@ async def read_docstring(
 
 @mcp.prompt()
 def agent_system_prompt() -> str:
-    """System prompt with the skills and tools from /skills and /tools embedded."""
+    """Generate a system prompt for agents with embedded skill and tool descriptions.
+
+    This prompt provides agents with:
+    - Overview of the skills system
+    - Dynamically embedded skill descriptions from /skills/ folder
+    - Dynamically embedded tool descriptions from /tools/ folder
+    - Workflow patterns for using skills with read_file tool
+    - Complete usage examples (no API calls, no package installation)
+
+    Returns:
+        Complete system prompt with all available skills and tools embedded
+    """
     logger.info("Generating agent system prompt with embedded skills and tools")
 
     try:

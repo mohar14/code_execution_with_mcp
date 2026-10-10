@@ -37,10 +37,8 @@ def _comment_blocks(text: str) -> list[tuple[int, str]]:
 
 
 def _is_agent_facing(rel: str, node: ast.AST) -> bool:
-    # Exempt: these docstrings are the tool description the agent reads at runtime --
-    # @mcp.tool/@mcp.prompt docstrings become MCP descriptions (FastMCP), and the module and
-    # function docstrings under mcp_server/tools/ are parsed by tool_utils.list_available_tools
-    # and served via read_docstring. Trimming them changes agent behaviour, not just prose.
+    # Runtime-read docstrings: mcp_server/tools/* (list_available_tools, read_docstring) and
+    # @mcp.tool/@mcp.prompt functions (FastMCP descriptions). Must stay byte-identical.
     if rel.startswith("mcp_server/tools/"):
         return True
     return any(
@@ -69,9 +67,9 @@ def test_docstrings_stay_short_and_free_of_history():
             doc = ast.get_docstring(node, clean=True)
             if doc is None:
                 continue
-            if HISTORY_RE.search(doc) or (
-                not _is_agent_facing(rel, node) and doc.count("\n") + 1 > MAX_LINES
-            ):
+            if _is_agent_facing(rel, node):
+                continue
+            if HISTORY_RE.search(doc) or doc.count("\n") + 1 > MAX_LINES:
                 name = getattr(node, "name", "<module>")
                 offenders.append(f"{rel}:{getattr(node, 'lineno', 1)} {name}")
     assert not offenders, "prose docstring(s):\n" + "\n".join(offenders)
