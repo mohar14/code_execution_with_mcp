@@ -1,5 +1,3 @@
-"""Utility functions for skill management and agent prompt generation."""
-
 import re
 from pathlib import Path
 
@@ -7,15 +5,6 @@ from loguru import logger
 
 
 def parse_skill_frontmatter(content: str) -> tuple[dict, str]:
-    """Parse YAML frontmatter from a skill markdown file.
-
-    Args:
-        content: The full content of the Skill.md file
-
-    Returns:
-        Tuple of (metadata_dict, content_without_frontmatter)
-    """
-    # Match YAML frontmatter between --- markers
     pattern = r"^---\s*\n(.*?)\n---\s*\n(.*)$"
     match = re.match(pattern, content, re.DOTALL)
 
@@ -24,7 +13,6 @@ def parse_skill_frontmatter(content: str) -> tuple[dict, str]:
 
     frontmatter, body = match.groups()
 
-    # Parse YAML-like frontmatter (simple key: value pairs)
     metadata = {}
     for line in frontmatter.split("\n"):
         line = line.strip()
@@ -36,18 +24,6 @@ def parse_skill_frontmatter(content: str) -> tuple[dict, str]:
 
 
 def get_skill(skill_name: str) -> dict:
-    """Retrieve a skill by name from the skills directory.
-
-    Args:
-        skill_name: Name of the skill directory
-
-    Returns:
-        Dictionary containing skill metadata and content
-
-    Raises:
-        FileNotFoundError: If skill doesn't exist
-    """
-    # Get the directory where this file is located
     server_dir = Path(__file__).parent.parent
     skills_dir = server_dir / "skills"
     skill_path = skills_dir / skill_name / "Skill.md"
@@ -55,10 +31,8 @@ def get_skill(skill_name: str) -> dict:
     if not skill_path.exists():
         raise FileNotFoundError(f"Skill '{skill_name}' not found")
 
-    # Read the skill file
     content = skill_path.read_text()
 
-    # Parse frontmatter and content
     metadata, body = parse_skill_frontmatter(content)
 
     return {
@@ -72,11 +46,6 @@ def get_skill(skill_name: str) -> dict:
 
 
 def list_available_skills() -> list[dict]:
-    """List all available skills in the skills directory.
-
-    Returns:
-        List of skill metadata dictionaries
-    """
     server_dir = Path(__file__).parent.parent
     skills_dir = server_dir / "skills"
 
@@ -90,7 +59,6 @@ def list_available_skills() -> list[dict]:
             if skill_file.exists():
                 try:
                     skill_data = get_skill(skill_dir.name)
-                    # Return lightweight metadata for listing
                     skills.append(
                         {
                             "skill_id": skill_data["skill_id"],
@@ -106,15 +74,6 @@ def list_available_skills() -> list[dict]:
 
 
 def extract_use_cases(content: str) -> str:
-    """Extract the 'When to Use This Skill' section from skill content.
-
-    Args:
-        content: Full skill markdown content
-
-    Returns:
-        Formatted use cases section, or empty string if not found
-    """
-    # Look for "When to Use This Skill" section
     pattern = (
         r"## When to Use This Skill\s*\n\s*(?:Invoke this skill when.*?:)?\s*\n((?:[-*]\s+.+\n?)+)"
     )
@@ -128,14 +87,6 @@ def extract_use_cases(content: str) -> str:
 
 
 def generate_skills_section(skills: list[dict]) -> str:
-    """Generate the skills section of the agent prompt.
-
-    Args:
-        skills: List of skill metadata dictionaries
-
-    Returns:
-        Formatted markdown section describing all available skills
-    """
     if not skills:
         return "No skills currently available.\n"
 
@@ -146,12 +97,10 @@ def generate_skills_section(skills: list[dict]) -> str:
         version = skill["version"]
         description = skill["description"]
 
-        # Get full skill data for dependencies
         try:
             full_skill = get_skill(skill_id)
             dependencies = full_skill.get("dependencies", "None")
 
-            # Extract "When to Use" section from skill content if available
             content = full_skill.get("content", "")
             use_cases = extract_use_cases(content)
 
@@ -160,7 +109,6 @@ def generate_skills_section(skills: list[dict]) -> str:
             dependencies = "Unknown"
             use_cases = ""
 
-        # Format skill section
         section = f"""---
 
 ### **{skill_id}**
@@ -177,16 +125,6 @@ def generate_skills_section(skills: list[dict]) -> str:
 
 
 def generate_agent_prompt(skills_section: str, tools_section: str = "") -> str:
-    """Generate the complete agent system prompt with embedded skills and tools.
-
-    Args:
-        skills_section: Formatted skills section to embed
-        tools_section: Formatted tools section to embed (optional)
-
-    Returns:
-        Complete system prompt markdown
-    """
-    # Generate tools content if tools are available
     tools_content = ""
     if tools_section:
         tools_content = f"""

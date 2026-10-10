@@ -1,5 +1,3 @@
-"""Gradio UI for Code Execution with MCP Agent."""
-
 import json
 import os
 import uuid
@@ -12,27 +10,21 @@ from dotenv import load_dotenv
 from loguru import logger
 from openai import AsyncOpenAI
 
-# Get project root directory (before loading env)
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
-# Load environment variables
 load_dotenv(PROJECT_ROOT / ".env")
 
-# Configuration
 AGENT_API_URL = os.getenv("AGENT_API_URL", "http://localhost:8000")
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "anthropic/claude-sonnet-4-5-20250929")
 
-# Initialize OpenAI client
 client = AsyncOpenAI(
     base_url=f"{AGENT_API_URL}/v1",
-    api_key="",  # Not used but required by the SDK
+    api_key="",
 )
 
-# Track which users have initialized containers (persists across chats)
 user_containers_initialized = set()
 
 
-# Custom CSS for better styling
 CUSTOM_CSS = """
 .container {
     max-width: 1400px;
@@ -230,20 +222,16 @@ CUSTOM_CSS = """
 
 
 async def check_health() -> dict:
-    """Check health of Agent API."""
     health_status = {
         "agent_api": {"status": "unknown", "message": ""},
     }
 
     try:
         async with httpx.AsyncClient() as http_client:
-            # Check Agent API
             try:
                 response = await http_client.get(f"{AGENT_API_URL}/health", timeout=5.0)
                 if response.status_code == 200:
                     data = response.json()
-                    # Note: mcp_server_connected is often false even when working
-                    # It only checks at startup, not during active use
                     health_status["agent_api"] = {
                         "status": "healthy"
                         if response.status_code == 200
@@ -268,14 +256,6 @@ async def check_health() -> dict:
 
 
 async def fetch_artifacts(user_id: str) -> list[str]:
-    """Fetch list of artifacts for a user from Agent API.
-
-    Args:
-        user_id: User identifier (e.g., "user-a1b2c3d4")
-
-    Returns:
-        List of artifact filenames
-    """
     try:
         async with httpx.AsyncClient() as http_client:
             response = await http_client.get(f"{AGENT_API_URL}/artifacts/{user_id}", timeout=10.0)
@@ -288,7 +268,6 @@ async def fetch_artifacts(user_id: str) -> list[str]:
 
 
 def format_health_status(health: dict) -> str:
-    """Format health status for display."""
     html = "<div style='font-family: monospace;'>"
 
     for service, info in health.items():
@@ -316,15 +295,6 @@ def format_health_status(health: dict) -> str:
 
 
 def format_artifacts_section(user_id: str, artifacts: list[str]) -> str:
-    """Format artifacts as HTML with clickable download links.
-
-    Args:
-        user_id: User identifier
-        artifacts: List of artifact filenames
-
-    Returns:
-        HTML string with styled artifact list
-    """
     if not artifacts:
         return """
         <div class="info-box" style="margin-top: 10px;">
@@ -338,7 +308,6 @@ def format_artifacts_section(user_id: str, artifacts: list[str]) -> str:
     artifact_links = []
     for artifact in artifacts:
         download_url = f"{AGENT_API_URL}/artifacts/{user_id}/{artifact}"
-        # Determine icon based on file extension
         icon = "📄"
         if artifact.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg")):
             icon = "🖼️"
@@ -376,25 +345,16 @@ def format_artifacts_section(user_id: str, artifacts: list[str]) -> str:
 
 
 async def refresh_artifacts_display(user_id: str) -> str:
-    """Refresh the artifacts display for current user.
-
-    Args:
-        user_id: Current user identifier
-
-    Returns:
-        HTML string with updated artifacts
-    """
     artifacts = await fetch_artifacts(user_id)
     return format_artifacts_section(user_id, artifacts)
 
 
 async def parse_stream_event(line: str) -> dict | None:
-    """Parse SSE event line."""
     if not line.strip() or line.startswith(":"):
         return None
 
     if line.startswith("data: "):
-        data = line[6:]  # Remove "data: " prefix
+        data = line[6:]
         if data.strip() == "[DONE]":
             return {"type": "done"}
         try:
@@ -406,7 +366,6 @@ async def parse_stream_event(line: str) -> dict | None:
 
 
 def format_tool_call(tool_name: str, arguments: str) -> str:
-    """Format tool call for display."""
     html = "<div class='tool-call'>"
     html += f"<div class='tool-call-header'>🔧 Tool Call: {tool_name}</div>"
 
@@ -415,7 +374,6 @@ def format_tool_call(tool_name: str, arguments: str) -> str:
         html += "<div style='margin-top: 0.5rem;'>"
         html += "<strong>Arguments:</strong><br>"
         for key, value in args.items():
-            # Truncate long values
             value_str = str(value)
             if len(value_str) > 200:
                 value_str = value_str[:200] + "..."
@@ -429,7 +387,6 @@ def format_tool_call(tool_name: str, arguments: str) -> str:
 
 
 def format_reasoning_step(content: str) -> str:
-    """Format reasoning step for display."""
     html = "<div class='reasoning-step'>"
     html += "<div><strong>🤔 Agent Reasoning:</strong></div>"
     html += f"<div style='margin-top: 0.5rem;'>{content}</div>"
@@ -438,7 +395,6 @@ def format_reasoning_step(content: str) -> str:
 
 
 def is_debug_content(text: str) -> bool:
-    """Check if text appears to be debug/internal content."""
     debug_patterns = [
         "parts=[Part(",
         "function_call=FunctionCall(",
@@ -452,11 +408,9 @@ def is_debug_content(text: str) -> bool:
 
 
 def clean_response_text(text: str) -> str:
-    """Clean response text by removing debug content."""
     if not text or not text.strip():
         return text
 
-    # If it looks like debug content, return empty
     if is_debug_content(text):
         return ""
 
@@ -466,7 +420,6 @@ def clean_response_text(text: str) -> str:
 def create_collapsible_section(
     title: str, icon: str, content: str, section_id: str, default_open: bool = True
 ) -> str:
-    """Create a collapsible section with HTML."""
     display_style = "block" if default_open else "none"
     toggle_char = "▼" if default_open else "▶"
 
@@ -485,7 +438,6 @@ def create_collapsible_section(
 
 
 def format_docker_action(action: str, details: str = "") -> str:
-    """Format Docker action for display."""
     html = "<div class='docker-info'>"
     html += f"<div><strong>🐳 Docker:</strong> {action}</div>"
     if details:
@@ -497,7 +449,6 @@ def format_docker_action(action: str, details: str = "") -> str:
 async def chat_with_agent(
     message: str, history: list[tuple[str, str]], user_id: str
 ) -> AsyncIterator[tuple[list[tuple[str, str]], str, str, str, str, str]]:
-    """Chat with the agent and stream responses."""
     global client
 
     if not message.strip():
@@ -511,7 +462,6 @@ async def chat_with_agent(
         )
         return
 
-    # Check if client is initialized
     if client is None:
         error_msg = "Services not initialized. Please wait for startup to complete."
         yield (
@@ -524,24 +474,20 @@ async def chat_with_agent(
         )
         return
 
-    # Add user message to history
     history.append((message, ""))
 
-    # Initialize tracking with separate sections
     docker_activities = []
     tool_calls_list = []
     status_updates = []
 
     current_response = ""
     tool_calls_buffer = {}
-    displayed_tool_calls = set()  # Track which tool calls we've already displayed
-    seen_first_tool_call = False  # Track if we've seen any tool calls
+    displayed_tool_calls = set()
+    seen_first_tool_call = False
 
-    # Check if this user already has an initialized container
     global user_containers_initialized
     is_first_execution = user_id not in user_containers_initialized
 
-    # Show initial container status
     if is_first_execution:
         docker_activities.append(format_docker_action("Preparing container", f"User: {user_id}"))
     else:
@@ -550,7 +496,6 @@ async def chat_with_agent(
         )
 
     try:
-        # Create chat completion stream
         stream = await client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=[{"role": "user", "content": message}],
@@ -558,7 +503,6 @@ async def chat_with_agent(
             user=user_id,
         )
 
-        # Build organized activity log - returns individual sections for Gradio Accordions
         def build_activity_logs():
             docker_html = (
                 "".join(docker_activities)
@@ -580,7 +524,6 @@ async def chat_with_agent(
 
         yield history, current_response, *build_activity_logs(), format_artifacts_section("", [])
 
-        # Process stream
         async for chunk in stream:
             logger.debug(f"chunk: {chunk.model_dump()}")
             if not chunk.choices:
@@ -589,13 +532,9 @@ async def chat_with_agent(
             choice = chunk.choices[0]
             delta = choice.delta
 
-            # Handle content (agent's response)
             if delta.content:
-                # Skip debug content, don't display it
                 if not is_debug_content(delta.content):
-                    # Add to chat response
                     current_response += delta.content
-                    # Update the last message in history
                     history[-1] = (message, current_response)
 
                 yield (
@@ -605,7 +544,6 @@ async def chat_with_agent(
                     format_artifacts_section("", []),
                 )
 
-            # Handle tool calls
             if delta.tool_calls:
                 for tool_call in delta.tool_calls:
                     tool_id = tool_call.id if tool_call.id else f"tool_{len(tool_calls_buffer)}"
@@ -619,42 +557,33 @@ async def chat_with_agent(
                         if tool_call.function.arguments:
                             tool_calls_buffer[tool_id]["arguments"] += tool_call.function.arguments
 
-            # After processing all tool calls in this chunk, check for complete ones to display
             for tool_id, tool_data in tool_calls_buffer.items():
-                # Only display if we have both name and arguments, and haven't displayed yet
                 if (
                     tool_data["name"]
                     and tool_data["arguments"]
                     and tool_id not in displayed_tool_calls
                 ):
-                    # Check if arguments are complete JSON
                     try:
                         json.loads(tool_data["arguments"])
-                        # JSON is valid, tool call is complete
                         displayed_tool_calls.add(tool_id)
 
                         tool_name = tool_data["name"]
                         tool_args = tool_data["arguments"]
 
-                        # Mark that we've seen a tool call
                         if not seen_first_tool_call:
                             seen_first_tool_call = True
 
-                            # For first-time users, show container initialization NOW (before tool execution)
                             if (
                                 is_first_execution
                                 and docker_activities
                                 and "Preparing container" in docker_activities[0]
                             ):
-                                # Replace "Preparing container" with "Initializing container"
                                 docker_activities[0] = format_docker_action(
                                     "Initializing container", f"User: {user_id}"
                                 )
 
-                        # Add to tool calls section
                         tool_calls_list.append(format_tool_call(tool_name, tool_args))
 
-                        # Add Docker-specific info
                         if tool_name == "execute_bash":
                             try:
                                 args = json.loads(tool_args)
@@ -694,20 +623,16 @@ async def chat_with_agent(
                             format_artifacts_section("", []),
                         )
                     except json.JSONDecodeError:
-                        # Arguments not complete yet, wait for more chunks
                         pass
 
-            # Handle finish reason
             if choice.finish_reason:
                 if choice.finish_reason == "stop":
                     status_updates.append(
                         "<div style='margin: 1rem 0; padding: 0.5rem; background: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;'>✅ <strong>Completed</strong></div>"
                     )
 
-                    # Mark container as ready after successful completion (first time only)
                     if is_first_execution and seen_first_tool_call:
                         user_containers_initialized.add(user_id)
-                        # Update docker status to show container is ready
                         if docker_activities and "Initializing container" in docker_activities[0]:
                             docker_activities.append(
                                 format_docker_action(
@@ -716,7 +641,6 @@ async def chat_with_agent(
                                 )
                             )
 
-                # Refresh artifacts on completion
                 if choice.finish_reason == "stop":
                     artifacts_html = await refresh_artifacts_display(user_id)
                     yield history, current_response, *build_activity_logs(), artifacts_html
@@ -743,13 +667,11 @@ async def chat_with_agent(
 
 
 async def refresh_health() -> str:
-    """Refresh health status."""
     health = await check_health()
     return format_health_status(health)
 
 
 def clear_chat() -> tuple[list, str, str, str, str, str]:
-    """Clear chat history and activity log."""
     return (
         [],
         "",
@@ -761,19 +683,12 @@ def clear_chat() -> tuple[list, str, str, str, str, str]:
 
 
 def new_session_and_clear() -> tuple[str, list, str, str, str, str, str]:
-    """Create new session with new user ID and clear all chat/activity logs.
-
-    Returns:
-        Tuple of (new_user_id, cleared_chat_outputs...)
-    """
     new_user_id = f"user-{uuid.uuid4().hex[:8]}"
     cleared = clear_chat()
     return (new_user_id, *cleared)
 
 
-# Create Gradio interface
 with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
-    # Header
     gr.HTML("""
         <div class="header">
             <h1>🚀 Code Execution with MCP</h1>
@@ -781,7 +696,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
         </div>
     """)
 
-    # Info Section
     with gr.Row():
         with gr.Column(scale=2):
             gr.Markdown("""
@@ -824,7 +738,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
     gr.Markdown("---")
 
-    # Chat Interface
     gr.Markdown("### 💬 Chat with Agent")
 
     with gr.Row():
@@ -873,7 +786,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
                     value=format_artifacts_section("", []), label="Artifacts"
                 )
 
-    # Examples
     gr.Markdown("### 💡 Example Queries")
     gr.Examples(
         examples=[
@@ -886,7 +798,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
         inputs=msg_input,
     )
 
-    # Event handlers
     async def submit_message(message, history, user_id):
         async for h, _resp, d_log, t_log, s_log, a_display in chat_with_agent(
             message, history, user_id
@@ -925,15 +836,12 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
         ],
     )
 
-    # Refresh artifacts button
     refresh_artifacts_btn.click(
         fn=refresh_artifacts_display, inputs=[user_id_display], outputs=[artifacts_display]
     )
 
-    # Load health status on startup
     demo.load(fn=refresh_health, outputs=health_display)
 
-    # Add JavaScript for collapsible sections
     demo.load(
         js="""
         function() {
@@ -969,7 +877,6 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
         """
     )
 
-    # Footer
     gr.Markdown("""
     ---
     <div style='text-align: center; color: #666; padding: 1rem 0;'>
@@ -981,6 +888,5 @@ with gr.Blocks(css=CUSTOM_CSS, title="Code Execution with MCP") as demo:
 
 
 if __name__ == "__main__":
-    # Start Gradio UI
     demo.queue()
     demo.launch(server_name="0.0.0.0", server_port=7860, share=False)

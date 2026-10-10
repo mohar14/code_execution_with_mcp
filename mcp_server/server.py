@@ -1,9 +1,3 @@
-"""MCP Server for Docker-based code execution.
-
-This server exposes the DockerExecutionClient methods as MCP tools,
-allowing AI agents to execute code in isolated Docker containers.
-"""
-
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -21,21 +15,13 @@ from utils import (
     list_available_tools,
 )
 
-# Global client instance (initialized in lifespan)
 docker_client: DockerExecutionClient | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastMCP):
-    """Lifespan context manager for server startup and shutdown.
-
-    Handles:
-    - Creating singleton DockerExecutionClient on startup
-    - Cleaning up all containers on shutdown
-    """
     global docker_client
 
-    # Startup
     logger.info("Starting MCP Code Executor server...")
     logger.info("Initializing Docker execution client...")
 
@@ -48,7 +34,6 @@ async def lifespan(app: FastMCP):
 
     yield
 
-    # Shutdown
     logger.info("Shutting down MCP server...")
     if docker_client:
         try:
@@ -59,23 +44,10 @@ async def lifespan(app: FastMCP):
             logger.error(f"Error during cleanup: {e}")
 
 
-# Initialize MCP server with lifespan
 mcp = FastMCP("code-executor", lifespan=lifespan)
 
 
 def get_user_id(ctx: Context) -> str:
-    """Extract user ID from MCP request context.
-
-    Checks for user ID in multiple possible header locations:
-    1. x-user-id
-
-    Args:
-        ctx: FastMCP request context
-
-    Returns:
-        User ID string
-    """
-    # Try different header variations
     request_headers = ctx.get_http_request().headers
     user_id = request_headers.get("x-user-id", "")
 
@@ -293,19 +265,14 @@ def agent_system_prompt() -> str:
     logger.info("Generating agent system prompt with embedded skills and tools")
 
     try:
-        # Get all available skills
         skills = list_available_skills()
 
-        # Generate skills section
         skills_section = generate_skills_section(skills)
 
-        # Get all available tools
         tools = list_available_tools()
 
-        # Generate tools section
         tools_section = generate_tools_section(tools)
 
-        # Generate complete prompt
         prompt = generate_agent_prompt(skills_section, tools_section)
 
         logger.info(f"Generated agent prompt with {len(skills)} skills and {len(tools)} tools")
@@ -316,17 +283,8 @@ def agent_system_prompt() -> str:
         raise
 
 
-# HTTP health check endpoint
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request):
-    """HTTP health check endpoint for monitoring and load balancers.
-
-    Args:
-        request: Starlette request object
-
-    Returns:
-        JSON response with server status
-    """
     return JSONResponse(
         {
             "status": "healthy",
@@ -336,17 +294,8 @@ async def health_check(request: Request):
     )
 
 
-# Skills endpoints
 @mcp.custom_route("/skills", methods=["GET"])
 async def list_skills(request: Request):
-    """List all available skills.
-
-    Args:
-        request: Starlette request object
-
-    Returns:
-        JSON response with list of available skills
-    """
     try:
         skills = list_available_skills()
         return JSONResponse(
@@ -367,14 +316,6 @@ async def list_skills(request: Request):
 
 @mcp.custom_route("/skills/{skill_name}", methods=["GET"])
 async def get_skill_by_name(request: Request):
-    """Retrieve a specific skill by name.
-
-    Args:
-        request: Starlette request object (skill_name extracted from path)
-
-    Returns:
-        JSON response with complete skill data including content
-    """
     skill_name = request.path_params.get("skill_name")
     try:
         skill_data = get_skill(skill_name)
@@ -396,23 +337,8 @@ async def get_skill_by_name(request: Request):
         )
 
 
-# Artifacts endpoints
 @mcp.custom_route("/{user_id}/artifacts", methods=["GET"])
 async def list_user_artifacts(request: Request):
-    """List all artifacts for a specific user.
-
-    Args:
-        request: Starlette request object (user_id extracted from path)
-
-    Returns:
-        JSON response with list of artifacts and count
-
-    Example Response:
-        {
-            "artifacts": ["report.pdf", "analysis.py", "chart.png"],
-            "count": 3
-        }
-    """
     user_id = request.path_params.get("user_id")
     logger.info(f"Listing artifacts for user {user_id}")
 
@@ -437,31 +363,6 @@ async def list_user_artifacts(request: Request):
 
 @mcp.custom_route("/{user_id}/artifacts/{artifact_id}", methods=["GET"])
 async def get_user_artifact(request: Request):
-    """Retrieve a specific artifact as base64-encoded string.
-
-    Args:
-        request: Starlette request object (user_id and artifact_id from path)
-
-    Returns:
-        JSON response with base64-encoded artifact data
-
-    Example Response:
-        {
-            "artifact_id": "report.pdf",
-            "data": "JVBERi0xLjQKJeLjz9MKMy...",
-            "encoding": "base64"
-        }
-
-    Error Response (404):
-        {
-            "error": "Artifact not found: report.pdf"
-        }
-
-    Error Response (400):
-        {
-            "error": "Artifact 'large.zip' is 52428800 bytes, exceeds limit of 52428800 bytes"
-        }
-    """
     user_id = request.path_params.get("user_id")
     artifact_id = request.path_params.get("artifact_id")
     logger.info(f"Retrieving artifact for user {user_id}: {artifact_id}")
@@ -485,7 +386,6 @@ async def get_user_artifact(request: Request):
         error_msg = str(e)
         logger.error(f"Error retrieving artifact for user {user_id}: {error_msg}")
 
-        # Determine appropriate status code
         if "not found" in error_msg.lower():
             status_code = 404
         elif "invalid" in error_msg.lower() or "exceeds limit" in error_msg.lower():
@@ -507,5 +407,4 @@ async def get_user_artifact(request: Request):
 
 
 if __name__ == "__main__":
-    # Run the MCP server
     mcp.run(transport="streamable-http", port=8989)

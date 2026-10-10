@@ -1,5 +1,3 @@
-"""Session management for Agent API."""
-
 from datetime import datetime, timedelta
 
 from config import settings
@@ -8,45 +6,28 @@ from loguru import logger
 
 
 class SessionStore:
-    """Manages user sessions and conversation history."""
-
     def __init__(self):
-        """Initialize the session store."""
         self.session_service = InMemorySessionService()
         self.user_sessions: dict[str, dict] = {}
         # Maps user_id -> {"session_id": str, "last_access": datetime}
         logger.info("SessionStore initialized")
 
     async def get_or_create_session(self, user_id: str, app_name: str = "agents") -> str:
-        """Get existing session or create new one for user.
-
-        Args:
-            user_id: User identifier
-            app_name: Application name for ADK session management
-
-        Returns:
-            Session ID for the user
-        """
         now = datetime.utcnow()
 
-        # Check if user has active session
         if user_id in self.user_sessions:
             session_info = self.user_sessions[user_id]
             last_access = session_info["last_access"]
 
-            # Check if session is still valid
             if now - last_access < timedelta(seconds=settings.session_timeout_seconds):
-                # Update last access time
                 session_info["last_access"] = now
                 logger.debug(f"Reusing existing session for user {user_id}")
                 return session_info["session_id"]
             else:
                 logger.info(f"Session expired for user {user_id}, creating new session")
 
-        # Create new session in ADK session service
         session_id = f"session-{user_id}-{int(now.timestamp())}"
 
-        # Create session in ADK with proper app_name (async call)
         await self.session_service.create_session(
             app_name=app_name,
             user_id=user_id,
@@ -61,10 +42,6 @@ class SessionStore:
         return session_id
 
     def cleanup_expired_sessions(self):
-        """Remove sessions older than timeout.
-
-        This should be called periodically as a background task.
-        """
         now = datetime.utcnow()
         expired_users = []
 
@@ -82,9 +59,4 @@ class SessionStore:
             logger.info(f"Cleaned up {len(expired_users)} expired sessions")
 
     def get_active_session_count(self) -> int:
-        """Get count of active sessions.
-
-        Returns:
-            Number of active sessions
-        """
         return len(self.user_sessions)
