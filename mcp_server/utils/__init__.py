@@ -1,5 +1,3 @@
-"""Utility modules for MCP server."""
-
 from .skill_utils import (
     extract_use_cases,
     generate_agent_prompt,
