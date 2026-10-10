@@ -90,6 +90,11 @@ This project implements this pattern using MCP (Model Context Protocol), achievi
 - Python 3.12+ with `uv`
 - API key in `.env` (supports any LLM via LiteLLM: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, etc.)
 
+### Components
+
+- **`mcp_server/`** - Docker-based code execution environment plus a FastMCP server that exposes tools for securely executing code and reading skills inside the container.
+- **`agent_api/`** - OpenAI-compatible API (Google ADK + FastAPI) exposing an agent with access to skills and the code execution environment.
+
 ### Setup
 
 ```bash
