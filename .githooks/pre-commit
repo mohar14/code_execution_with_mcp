@@ -1,2 +1,4 @@
 #!/bin/sh
+root=$(git rev-parse --show-toplevel) || exit 0
+python3 "$root/scripts/size_ratchet.py" --if-merge || exit 1
 exec uv run --frozen pytest tests/test_no_prose_comments.py -q

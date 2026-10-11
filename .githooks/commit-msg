@@ -1,0 +1,3 @@
+#!/bin/sh
+root=$(git rev-parse --show-toplevel) || exit 0
+exec python3 "$root/scripts/size_ratchet.py" --msg-file "$1"
